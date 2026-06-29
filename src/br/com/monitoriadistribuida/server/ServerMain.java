@@ -1,38 +1,43 @@
-package br.com.monitoriadistribuida.server; 
+package br.com.monitoriadistribuida.server;
 
-import br.com.monitoriadistribuida.server.service.UserService; 
-import java.io.IOException; 
-import java.net.ServerSocket; 
-import java.net.Socket; 
+import br.com.monitoriadistribuida.server.service.MonitorService;
+import br.com.monitoriadistribuida.server.service.UserService;
 
-public class ServerMain { 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 
-    private static final int PORTA = 5000; 
+public class ServerMain {
 
-    public static void main(String[] args) { 
+    private static final int PORTA = 5000;
 
-        UserService userService = new UserService(); 
+    public static void main(String[] args) {
 
-        System.out.println("Iniciando servidor central..."); 
+        UserService userService = new UserService();
 
-        try (ServerSocket serverSocket = new ServerSocket(PORTA)) { 
+        MonitorService monitorService = new MonitorService();
+
+        System.out.println("Iniciando servidor central...");
+
+        try (ServerSocket serverSocket = new ServerSocket(PORTA)) {
 
             System.out.println("Servidor iniciado na porta " + PORTA);
 
             while (true) {
 
-                Socket clientSocket = serverSocket.accept(); 
+                Socket clientSocket = serverSocket.accept();
+
                 System.out.println("Novo cliente conectado: " + clientSocket.getInetAddress());
 
-                ClientHandler clientHandler = new ClientHandler(clientSocket, userService); 
+                ClientHandler clientHandler = new ClientHandler(clientSocket, userService, monitorService);
 
-                Thread threadCliente = new Thread(clientHandler); 
+                Thread threadCliente = new Thread(clientHandler);
 
                 threadCliente.start();
             }
 
-        } catch (IOException e) { 
-            System.out.println("Erro no servidor: " + e.getMessage()); // Exibe a mensagem de erro.
-        } 
-    } 
-} 
+        } catch (IOException e) {
+            System.out.println("Erro no servidor: " + e.getMessage());
+        }
+    }
+}

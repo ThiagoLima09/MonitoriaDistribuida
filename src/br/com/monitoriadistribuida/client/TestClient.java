@@ -15,16 +15,25 @@ public class TestClient {
 
         PrintWriter saida = new PrintWriter(socket.getOutputStream(), true);
 
+        saida.println("CADASTRO;Joao;joao@email.com;123;MONITOR");
+        System.out.println(entrada.readLine());
+
         saida.println("CADASTRO;Lucas;lucas@email.com;123;ALUNO");
         System.out.println(entrada.readLine());
 
-        saida.println("LOGIN;lucas@email.com;123");
+        saida.println("LISTAR_DISCIPLINAS");
         System.out.println(entrada.readLine());
 
-        saida.println("LISTAR_USUARIOS");
+        saida.println("ATUALIZAR_STATUS;joao@email.com;DISPONIVEL;PROGRAMACAO;5001");
         System.out.println(entrada.readLine());
 
-        saida.println("SAIR");
+        saida.println("LISTAR_MONITORES;PROGRAMACAO");
+        System.out.println(entrada.readLine());
+
+        saida.println("SOLICITAR_ATENDIMENTO;lucas@email.com;joao@email.com");
+        System.out.println(entrada.readLine());
+
+        saida.println("LISTAR_MONITORES;PROGRAMACAO");
         System.out.println(entrada.readLine());
 
         socket.close();
