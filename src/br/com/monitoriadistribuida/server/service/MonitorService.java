@@ -16,6 +16,16 @@ public class MonitorService {
     private Map<String, MonitorDisponivel> monitoresDisponiveis = new ConcurrentHashMap<>();
 
     public boolean atualizarStatus(Usuario usuario, StatusMonitor status, Disciplina disciplina, String ip, int porta) {
+        return atualizarStatus(usuario, status, disciplina, ip, porta, 0, 0);
+    }
+
+    public boolean atualizarStatus(Usuario usuario,
+                                   StatusMonitor status,
+                                   Disciplina disciplina,
+                                   String ip,
+                                   int portaChat,
+                                   int portaVideo,
+                                   int portaAudio) {
         if (usuario == null) {
             return false;
         }
@@ -34,7 +44,9 @@ public class MonitorService {
                 usuario.getEmail(),
                 disciplina,
                 ip,
-                porta,
+                portaChat,
+                portaVideo,
+                portaAudio,
                 status
         );
 
