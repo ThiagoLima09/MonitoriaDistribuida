@@ -6,15 +6,30 @@ public class MonitorDisponivel {
     private String email;
     private Disciplina disciplina;
     private String ip;
-    private int porta;
+    private int portaChat;
+    private int portaVideo;
+    private int portaAudio;
     private StatusMonitor status;
 
     public MonitorDisponivel(String nome, String email, Disciplina disciplina, String ip, int porta, StatusMonitor status) {
+        this(nome, email, disciplina, ip, porta, 0, 0, status);
+    }
+
+    public MonitorDisponivel(String nome,
+                             String email,
+                             Disciplina disciplina,
+                             String ip,
+                             int portaChat,
+                             int portaVideo,
+                             int portaAudio,
+                             StatusMonitor status) {
         this.nome = nome;
         this.email = email;
         this.disciplina = disciplina;
         this.ip = ip;
-        this.porta = porta;
+        this.portaChat = portaChat;
+        this.portaVideo = portaVideo;
+        this.portaAudio = portaAudio;
         this.status = status;
     }
 
@@ -35,7 +50,19 @@ public class MonitorDisponivel {
     }
 
     public int getPorta() {
-        return porta;
+        return portaChat;
+    }
+
+    public int getPortaChat() {
+        return portaChat;
+    }
+
+    public int getPortaVideo() {
+        return portaVideo;
+    }
+
+    public int getPortaAudio() {
+        return portaAudio;
     }
 
     public StatusMonitor getStatus() {
@@ -55,6 +82,18 @@ public class MonitorDisponivel {
     }
 
     public void setPorta(int porta) {
-        this.porta = porta;
+        this.portaChat = porta;
+    }
+
+    public void setPortaChat(int portaChat) {
+        this.portaChat = portaChat;
+    }
+
+    public void setPortaVideo(int portaVideo) {
+        this.portaVideo = portaVideo;
+    }
+
+    public void setPortaAudio(int portaAudio) {
+        this.portaAudio = portaAudio;
     }
 }
