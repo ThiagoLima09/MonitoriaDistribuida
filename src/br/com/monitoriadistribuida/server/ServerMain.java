@@ -9,7 +9,7 @@ import java.net.Socket;
 
 public class ServerMain {
 
-    private static final int PORTA = 5000;
+    private static final int PORTA = 5001;
 
     public static void main(String[] args) {
 
