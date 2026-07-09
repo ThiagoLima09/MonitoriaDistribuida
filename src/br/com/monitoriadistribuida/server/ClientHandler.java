@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.List;
 
 public class ClientHandler implements Runnable {
 
@@ -181,8 +180,8 @@ public class ClientHandler implements Runnable {
     }
 
     private String atualizarStatusMonitor(String[] partes) {
-        if (partes.length != 5) {
-            return "ERRO;Formato correto: ATUALIZAR_STATUS;email;status;disciplina;porta";
+        if (partes.length != 5 && partes.length != 7) {
+            return "ERRO;Formato correto: ATUALIZAR_STATUS;email;status;disciplina;portaChat;portaVideo;portaAudio";
         }
 
         try {
@@ -192,7 +191,17 @@ public class ClientHandler implements Runnable {
 
             Disciplina disciplina = Disciplina.fromTexto(partes[3]);
 
-            int porta = Integer.parseInt(partes[4]);
+            int portaChat = parsePorta(partes[4]);
+
+            int portaVideo = 0;
+
+            int portaAudio = 0;
+
+            if (partes.length == 7) {
+                portaVideo = parsePorta(partes[5]);
+
+                portaAudio = parsePorta(partes[6]);
+            }
 
             Usuario usuario = userService.buscarPorEmail(email);
 
@@ -206,7 +215,14 @@ public class ClientHandler implements Runnable {
 
             String ip = clientSocket.getInetAddress().getHostAddress();
 
-            boolean atualizado = monitorService.atualizarStatus(usuario, status, disciplina, ip, porta);
+            boolean atualizado = monitorService.atualizarStatus(
+                    usuario,
+                    status,
+                    disciplina,
+                    ip,
+                    portaChat,
+                    portaVideo,
+                    portaAudio);
 
             if (!atualizado) {
                 return "ERRO;Não foi possível atualizar status do monitor";
@@ -247,7 +263,11 @@ public class ClientHandler implements Runnable {
                         .append(",")
                         .append(monitor.getIp())
                         .append(",")
-                        .append(monitor.getPorta());
+                        .append(monitor.getPortaChat())
+                        .append(",")
+                        .append(monitor.getPortaVideo())
+                        .append(",")
+                        .append(monitor.getPortaAudio());
             }
 
             return resposta.toString();
@@ -287,7 +307,19 @@ public class ClientHandler implements Runnable {
                 + monitor.getEmail() + ";"
                 + monitor.getDisciplina().getNomeExibicao() + ";"
                 + monitor.getIp() + ";"
-                + monitor.getPorta();
+                + monitor.getPortaChat() + ";"
+                + monitor.getPortaVideo() + ";"
+                + monitor.getPortaAudio();
+    }
+
+    private int parsePorta(String valor) {
+        int porta = Integer.parseInt(valor);
+
+        if (porta < 0 || porta > 65535) {
+            throw new IllegalArgumentException("Porta fora do intervalo permitido");
+        }
+
+        return porta;
     }
 
     private String listarUsuarios() {
