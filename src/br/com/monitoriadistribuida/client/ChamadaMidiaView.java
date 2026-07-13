@@ -3,6 +3,7 @@ package br.com.monitoriadistribuida.client;
 import br.com.monitoriadistribuida.network.OuvinteChamadaAudio;
 import br.com.monitoriadistribuida.network.ConexaoAudioP2P;
 import br.com.monitoriadistribuida.network.FonteQuadroTela;
+import br.com.monitoriadistribuida.network.FonteQuadroWebcam;
 import br.com.monitoriadistribuida.network.OuvinteQuadroVideo;
 import br.com.monitoriadistribuida.network.ConexaoVideoP2P;
 
@@ -37,12 +38,16 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
     private final JFrame telaAnterior;
     private final SessionContext session;
     private final String nomePar;
+    private final Runnable aoEncerrarChamada;
     private final JLabel rotuloVideo = new JLabel("Aguardando vídeo", SwingConstants.CENTER);
     private final JLabel rotuloStatus = new JLabel();
     private volatile ConexaoVideoP2P conexaoVideo;
     private volatile ConexaoAudioP2P conexaoAudio;
-    private boolean compartilhandoTela;
-    private boolean audioAtivo;
+    private volatile FonteQuadroWebcam fonteWebcam;
+    private boolean transmitindoVideo;
+    private boolean microfoneAtivo = true;
+    private boolean chamadaEncerrada;
+    private volatile boolean recursosFechando;
 
     public ChamadaMidiaView(JFrame telaAnterior,
                          SessionContext session,
@@ -50,9 +55,20 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
                          String endereco,
                          int portaVideo,
                          int portaAudio) {
+        this(telaAnterior, session, nomePar, endereco, portaVideo, portaAudio, null);
+    }
+
+    public ChamadaMidiaView(JFrame telaAnterior,
+                         SessionContext session,
+                         String nomePar,
+                         String endereco,
+                         int portaVideo,
+                         int portaAudio,
+                         Runnable aoEncerrarChamada) {
         this.telaAnterior = telaAnterior;
         this.session = session;
         this.nomePar = normalizarNomePar(nomePar);
+        this.aoEncerrarChamada = aoEncerrarChamada;
         montarTela("Conectando mídia...");
         conectarAoPar(endereco, portaVideo, portaAudio);
     }
@@ -62,9 +78,19 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
                          String nomePar,
                          int portaEscutaVideo,
                          int portaEscutaAudio) {
+        this(telaAnterior, session, nomePar, portaEscutaVideo, portaEscutaAudio, null);
+    }
+
+    public ChamadaMidiaView(JFrame telaAnterior,
+                         SessionContext session,
+                         String nomePar,
+                         int portaEscutaVideo,
+                         int portaEscutaAudio,
+                         Runnable aoEncerrarChamada) {
         this.telaAnterior = telaAnterior;
         this.session = session;
         this.nomePar = normalizarNomePar(nomePar);
+        this.aoEncerrarChamada = aoEncerrarChamada;
         montarTela("Abrindo portas de mídia...");
         aguardarPar(portaEscutaVideo, portaEscutaAudio);
     }
@@ -102,7 +128,8 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
 
     @Override
     public void dispose() {
-        fecharMidia();
+        chamadaEncerrada = true;
+        fecharMidiaEmSegundoPlano();
         super.dispose();
     }
 
@@ -134,7 +161,7 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
         grupoTitulo.setLayout(new BoxLayout(grupoTitulo, BoxLayout.Y_AXIS));
 
         JLabel titulo = SwingUtils.createTitle("Chamada P2P");
-        JLabel subtitulo = new JLabel("Usuário: " + session.getNome() + " | Par: " + nomePar);
+        JLabel subtitulo = new JLabel("Usuário: " + session.getNome() + " | Com: " + nomePar);
         subtitulo.setForeground(SwingUtils.MUTED);
         subtitulo.setFont(subtitulo.getFont().deriveFont(Font.PLAIN, 14f));
 
@@ -171,21 +198,21 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
         controles.setOpaque(false);
 
         JButton botaoIniciarTela = SwingUtils.createPrimaryButton("Compartilhar tela");
-        JButton botaoPararTela = SwingUtils.createSecondaryButton("Parar tela");
-        JButton botaoIniciarAudio = SwingUtils.createPrimaryButton("Ligar áudio");
-        JButton botaoPararAudio = SwingUtils.createSecondaryButton("Desligar áudio");
+        JButton botaoIniciarWebcam = SwingUtils.createPrimaryButton("Compartilhar webcam");
+        JButton botaoPararVideo = SwingUtils.createSecondaryButton("Parar vídeo");
+        JButton botaoMicrofone = SwingUtils.createSecondaryButton("Mutar microfone");
         JButton botaoEncerrar = SwingUtils.createGhostButton("Encerrar");
 
         botaoIniciarTela.addActionListener(e -> iniciarCompartilhamentoTela());
-        botaoPararTela.addActionListener(e -> pararCompartilhamentoTela());
-        botaoIniciarAudio.addActionListener(e -> iniciarAudio());
-        botaoPararAudio.addActionListener(e -> pararAudio());
+        botaoIniciarWebcam.addActionListener(e -> iniciarCompartilhamentoWebcam());
+        botaoPararVideo.addActionListener(e -> pararTransmissaoVideo());
+        botaoMicrofone.addActionListener(e -> alternarMicrofone(botaoMicrofone));
         botaoEncerrar.addActionListener(e -> encerrarChamada());
 
         controles.add(botaoIniciarTela);
-        controles.add(botaoPararTela);
-        controles.add(botaoIniciarAudio);
-        controles.add(botaoPararAudio);
+        controles.add(botaoIniciarWebcam);
+        controles.add(botaoPararVideo);
+        controles.add(botaoMicrofone);
         controles.add(botaoEncerrar);
         return controles;
     }
@@ -200,6 +227,8 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
                 audio = new ConexaoAudioP2P(endereco, portaAudio, this);
                 conexaoVideo = video;
                 conexaoAudio = audio;
+                conexaoAudio.iniciarEscuta();
+                conexaoAudio.ativarMicrofone();
                 SwingUtilities.invokeLater(() -> definirStatus("Mídia conectada", SwingUtils.SUCCESS));
             } catch (IOException | IllegalArgumentException e) {
                 if (video != null) {
@@ -225,6 +254,8 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
         try {
             conexaoVideo = new ConexaoVideoP2P(portaEscutaVideo, this);
             conexaoAudio = new ConexaoAudioP2P(portaEscutaAudio, this);
+            conexaoAudio.iniciarEscuta();
+            conexaoAudio.ativarMicrofone();
             definirStatus("Vídeo " + conexaoVideo.getPortaLocal() + " | Áudio " + conexaoAudio.getPortaLocal(),
                     SwingUtils.WARNING);
         } catch (IOException | IllegalArgumentException e) {
@@ -240,43 +271,64 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
         }
 
         try {
+            fecharFonteWebcam();
             conexaoVideo.iniciarTransmissao(new FonteQuadroTela(), FPS_TELA_PADRAO, QUALIDADE_JPEG_PADRAO);
-            compartilhandoTela = true;
+            transmitindoVideo = true;
             definirStatus("Compartilhando tela", SwingUtils.SUCCESS);
         } catch (Exception e) {
-            compartilhandoTela = false;
+            transmitindoVideo = false;
             definirStatus("Falha na captura", SwingUtils.DANGER);
             SwingUtils.showError(this, "Chamada", "Não foi possível capturar a tela: " + e.getMessage());
         }
     }
 
-    private void pararCompartilhamentoTela() {
+    private void iniciarCompartilhamentoWebcam() {
+        if (conexaoVideo == null) {
+            SwingUtils.showWarning(this, "Chamada", "Canal de vídeo não foi inicializado.");
+            return;
+        }
+
+        try {
+            fecharFonteWebcam();
+            fonteWebcam = new FonteQuadroWebcam();
+            conexaoVideo.iniciarTransmissao(fonteWebcam, FPS_TELA_PADRAO, QUALIDADE_JPEG_PADRAO);
+            transmitindoVideo = true;
+            definirStatus("Compartilhando webcam", SwingUtils.SUCCESS);
+        } catch (Exception e) {
+            fecharFonteWebcam();
+            transmitindoVideo = false;
+            definirStatus("Falha na webcam", SwingUtils.DANGER);
+            SwingUtils.showError(this, "Chamada", "Não foi possível abrir a webcam: " + e.getMessage());
+        }
+    }
+
+    private void pararTransmissaoVideo() {
         if (conexaoVideo != null) {
             conexaoVideo.pararTransmissao();
         }
 
-        compartilhandoTela = false;
-        definirStatus(audioAtivo ? "Áudio ativo" : "Tela pausada", SwingUtils.WARNING);
+        fecharFonteWebcam();
+        transmitindoVideo = false;
+        definirStatus("Vídeo pausado", SwingUtils.WARNING);
     }
 
-    private void iniciarAudio() {
+    private void alternarMicrofone(JButton botaoMicrofone) {
         if (conexaoAudio == null) {
             SwingUtils.showWarning(this, "Chamada", "Canal de áudio não foi inicializado.");
             return;
         }
 
-        conexaoAudio.iniciarAudio();
-        audioAtivo = true;
-        definirStatus(compartilhandoTela ? "Tela e áudio ativos" : "Áudio ativo", SwingUtils.SUCCESS);
-    }
-
-    private void pararAudio() {
-        if (conexaoAudio != null) {
-            conexaoAudio.pararAudio();
+        if (microfoneAtivo) {
+            conexaoAudio.silenciarMicrofone();
+            microfoneAtivo = false;
+            botaoMicrofone.setText("Ativar microfone");
+            definirStatus("Microfone mutado", SwingUtils.WARNING);
+        } else {
+            conexaoAudio.ativarMicrofone();
+            microfoneAtivo = true;
+            botaoMicrofone.setText("Mutar microfone");
+            definirStatus(transmitindoVideo ? "Vídeo e microfone ativos" : "Microfone ativo", SwingUtils.SUCCESS);
         }
-
-        audioAtivo = false;
-        definirStatus(compartilhandoTela ? "Compartilhando tela" : "Áudio desligado", SwingUtils.WARNING);
     }
 
     private void renderizarQuadro(BufferedImage quadro) {
@@ -310,11 +362,22 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
     }
 
     private void encerrarChamada() {
-        fecharMidia();
-        dispose();
+        if (chamadaEncerrada) {
+            return;
+        }
+
+        chamadaEncerrada = true;
+
+        if (aoEncerrarChamada != null) {
+            aoEncerrarChamada.run();
+        }
+
+        fecharMidiaEmSegundoPlano();
+        setVisible(false);
+        super.dispose();
 
         if (telaAnterior != null) {
-            telaAnterior.setVisible(true);
+            SwingUtils.exibirCentralizado(telaAnterior);
         }
     }
 
@@ -327,6 +390,27 @@ public class ChamadaMidiaView extends JFrame implements OuvinteQuadroVideo, Ouvi
         if (conexaoAudio != null) {
             conexaoAudio.close();
             conexaoAudio = null;
+        }
+
+        fecharFonteWebcam();
+    }
+
+    private void fecharMidiaEmSegundoPlano() {
+        if (recursosFechando) {
+            return;
+        }
+
+        recursosFechando = true;
+
+        Thread thread = new Thread(this::fecharMidia, "thread-fechamento-midia-p2p");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void fecharFonteWebcam() {
+        if (fonteWebcam != null) {
+            fonteWebcam.close();
+            fonteWebcam = null;
         }
     }
 
