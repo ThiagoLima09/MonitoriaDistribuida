@@ -21,11 +21,20 @@ public class ClientHandler implements Runnable {
     private Socket clientSocket;
     private UserService userService;
     private MonitorService monitorService;
+    private SessionManager sessionManager;
 
     public ClientHandler(Socket clientSocket, UserService userService, MonitorService monitorService) {
+        this(clientSocket, userService, monitorService, new SessionManager());
+    }
+
+    public ClientHandler(Socket clientSocket,
+                         UserService userService,
+                         MonitorService monitorService,
+                         SessionManager sessionManager) {
         this.clientSocket = clientSocket;
         this.userService = userService;
         this.monitorService = monitorService;
+        this.sessionManager = sessionManager;
     }
 
     @Override
@@ -47,7 +56,17 @@ public class ClientHandler implements Runnable {
 
                 System.out.println("Cliente enviou: " + mensagemRecebida);
 
-                String resposta = processarComando(mensagemRecebida);
+                String resposta;
+
+                try {
+                    resposta = processarComando(mensagemRecebida);
+                } catch (IllegalStateException e) {
+                    resposta = "ERRO;" + e.getMessage();
+                    System.out.println("Erro interno ao processar comando: " + e.getMessage());
+                } catch (RuntimeException e) {
+                    resposta = "ERRO;Falha interna no servidor";
+                    System.out.println("Falha inesperada ao processar comando: " + e.getMessage());
+                }
 
                 saida.println(resposta);
 
@@ -62,6 +81,8 @@ public class ClientHandler implements Runnable {
             System.out.println("Cliente desconectado ou erro de comunicação: " + e.getMessage());
 
         } finally {
+            sessionManager.removerSessao(clientSocket);
+
             try {
                 clientSocket.close();
             } catch (IOException e) {
@@ -110,6 +131,7 @@ public class ClientHandler implements Runnable {
         }
 
         if (comando.equals("SAIR")) {
+            sessionManager.removerSessao(clientSocket);
             return "OK;Conexão encerrada";
         }
 
@@ -127,7 +149,7 @@ public class ClientHandler implements Runnable {
             String nome = partes[1];
             String email = partes[2];
             String senha = partes[3];
-            TipoUsuario tipo = TipoUsuario.valueOf(partes[4].toUpperCase());
+            TipoUsuario tipo = TipoUsuario.fromTexto(partes[4]);
 
             Usuario usuario = new Usuario(nome, email, senha, tipo);
 
@@ -161,6 +183,8 @@ public class ClientHandler implements Runnable {
             return "ERRO;Email ou senha inválidos";
         }
 
+        sessionManager.registrarSessao(clientSocket, usuario);
+
         return "OK;Login realizado;" + usuario.getTipo() + ";" + usuario.getNome();
     }
 
@@ -180,6 +204,10 @@ public class ClientHandler implements Runnable {
     }
 
     private String atualizarStatusMonitor(String[] partes) {
+        if (!sessionManager.existeSessaoAtiva(clientSocket)) {
+            return "ERRO;Faça login antes de atualizar status";
+        }
+
         if (partes.length != 5 && partes.length != 7) {
             return "ERRO;Formato correto: ATUALIZAR_STATUS;email;status;disciplina;portaChat;portaVideo;portaAudio";
         }
@@ -236,6 +264,10 @@ public class ClientHandler implements Runnable {
     }
 
     private String listarMonitores(String[] partes) {
+        if (!sessionManager.existeSessaoAtiva(clientSocket)) {
+            return "ERRO;Faça login antes de listar monitores";
+        }
+
         if (partes.length != 2) {
             return "ERRO;Formato correto: LISTAR_MONITORES;disciplina";
         }
@@ -278,6 +310,10 @@ public class ClientHandler implements Runnable {
     }
 
     private String solicitarAtendimento(String[] partes) {
+        if (!sessionManager.existeSessaoAtiva(clientSocket)) {
+            return "ERRO;Faça login antes de solicitar atendimento";
+        }
+
         if (partes.length != 3) {
             return "ERRO;Formato correto: SOLICITAR_ATENDIMENTO;emailAluno;emailMonitor";
         }

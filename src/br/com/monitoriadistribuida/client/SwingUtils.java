@@ -199,6 +199,15 @@ public final class SwingUtils {
         frame.setLocationRelativeTo(null);
     }
 
+    public static void exibirCentralizado(JFrame frame) {
+        if (frame == null) {
+            return;
+        }
+
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
     public static Dimension screenSize() {
         return Toolkit.getDefaultToolkit().getScreenSize();
     }

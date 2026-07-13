@@ -19,6 +19,7 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 
 import br.com.monitoriadistribuida.server.model.TipoUsuario;
 
@@ -29,7 +30,7 @@ public class CadastroView extends JFrame {
     private final JTextField nomeField = SwingUtils.createTextField("Nome completo");
     private final JTextField emailField = SwingUtils.createTextField("E-mail");
     private final JPasswordField senhaField = SwingUtils.createPasswordField("Senha");
-    private final JPasswordField confirmacaoField = SwingUtils.createPasswordField("Confirmacao de senha");
+    private final JPasswordField confirmacaoField = SwingUtils.createPasswordField("Confirmação de senha");
     private final JComboBox<TipoUsuario> tipoCombo = new JComboBox<>(TipoUsuario.values());
 
     public CadastroView(JFrame loginFrame) {
@@ -59,7 +60,7 @@ public class CadastroView extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(42, 24, 42, 24));
         panel.setPreferredSize(new Dimension(380, 0));
 
-        JLabel badge = new JLabel("Novo usuario", SwingConstants.LEFT);
+        JLabel badge = new JLabel("Novo usuário", SwingConstants.LEFT);
         badge.setOpaque(true);
         badge.setBackground(new Color(220, 252, 231));
         badge.setForeground(new Color(22, 101, 52));
@@ -70,7 +71,7 @@ public class CadastroView extends JFrame {
         title.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel subtitle = new JLabel(
-                "<html><div style='width:290px'>Cadastro simples com nome, e-mail, senha e tipo de usuario. Sem campos extras ainda, porque o backend nao pede mais do que isso.</div></html>");
+                "<html><div style='width:290px'>Cadastro simples com nome, e-mail, senha e tipo de usuário. Sem campos extras, porque o servidor central não pede mais do que isso.</div></html>");
         subtitle.setForeground(SwingUtils.MUTED);
         subtitle.setFont(subtitle.getFont().deriveFont(16f));
         subtitle.setAlignmentX(LEFT_ALIGNMENT);
@@ -114,7 +115,7 @@ public class CadastroView extends JFrame {
         JLabel title = SwingUtils.createSectionLabel("Cadastro");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 20f));
 
-        JLabel helper = new JLabel("Os dados abaixo correspondem ao que o backend cadastra hoje.");
+        JLabel helper = new JLabel("Os dados abaixo correspondem ao que o servidor central cadastra hoje.");
         helper.setForeground(SwingUtils.MUTED);
 
         JButton cadastrarButton = SwingUtils.createPrimaryButton("Cadastrar");
@@ -131,9 +132,9 @@ public class CadastroView extends JFrame {
         gbc.gridy++;
         inner.add(labeledField("Senha", senhaField), gbc);
         gbc.gridy++;
-        inner.add(labeledField("Confirmacao de senha", confirmacaoField), gbc);
+        inner.add(labeledField("Confirmação de senha", confirmacaoField), gbc);
         gbc.gridy++;
-        inner.add(labeledField("Tipo de usuario", tipoCombo), gbc);
+        inner.add(labeledField("Tipo de usuário", tipoCombo), gbc);
         gbc.gridy++;
         inner.add(cadastrarButton, gbc);
         gbc.gridy++;
@@ -164,24 +165,32 @@ public class CadastroView extends JFrame {
     }
 
     private void handleCadastro() {
-        try {
-            controller.validateCadastro(
-                    nomeField.getText(),
-                    emailField.getText(),
-                    new String(senhaField.getPassword()),
-                    new String(confirmacaoField.getPassword()),
-                    (TipoUsuario) tipoCombo.getSelectedItem());
-            SwingUtils.showInfo(this, "Cadastro", "Cadastro realizado com sucesso.");
-            voltarLogin();
-        } catch (IllegalArgumentException ex) {
-            SwingUtils.showError(this, "Cadastro", ex.getMessage());
-        }
+        String nome = nomeField.getText();
+        String email = emailField.getText();
+        String senha = new String(senhaField.getPassword());
+        String confirmacao = new String(confirmacaoField.getPassword());
+        TipoUsuario tipoUsuario = (TipoUsuario) tipoCombo.getSelectedItem();
+
+        Thread threadCadastro = new Thread(() -> {
+            try {
+                controller.cadastrar(nome, email, senha, confirmacao, tipoUsuario);
+                SwingUtilities.invokeLater(() -> {
+                    SwingUtils.showInfo(this, "Cadastro", "Cadastro realizado com sucesso.");
+                    voltarLogin();
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> SwingUtils.showError(this, "Cadastro", ex.getMessage()));
+            }
+        }, "thread-cadastro-servidor");
+
+        threadCadastro.setDaemon(true);
+        threadCadastro.start();
     }
 
     private void voltarLogin() {
         dispose();
         if (loginFrame != null) {
-            loginFrame.setVisible(true);
+            SwingUtils.exibirCentralizado(loginFrame);
         }
     }
 }

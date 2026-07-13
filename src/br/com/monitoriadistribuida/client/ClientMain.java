@@ -6,6 +6,6 @@ public class ClientMain {
 
     public static void main(String[] args) {
         SwingUtils.installModernTheme();
-        SwingUtilities.invokeLater(() -> new LoginView().setVisible(true));
+        SwingUtilities.invokeLater(() -> SwingUtils.exibirCentralizado(new LoginView()));
     }
 }

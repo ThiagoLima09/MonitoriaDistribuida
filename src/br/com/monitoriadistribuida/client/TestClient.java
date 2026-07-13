@@ -23,13 +23,30 @@ public class TestClient {
         saida.println("CADASTRO;Lucas;lucas@email.com;123;ALUNO");
         System.out.println(entrada.readLine());
 
+        saida.println("LOGIN;joao@email.com;123");
+        System.out.println(entrada.readLine());
+
         saida.println("LISTAR_DISCIPLINAS");
         System.out.println(entrada.readLine());
 
-        saida.println("ATUALIZAR_STATUS;joao@email.com;DISPONIVEL;PROGRAMACAO;5001;5002;5003");
+        saida.println("ATUALIZAR_STATUS;joao@email.com;DISPONIVEL;PROGRAMACAO;6001;6002;6003");
         System.out.println(entrada.readLine());
 
         saida.println("LISTAR_MONITORES;PROGRAMACAO");
+        System.out.println(entrada.readLine());
+
+        saida.println("SAIR");
+        System.out.println(entrada.readLine());
+        socket.close();
+
+        socket = new Socket("localhost", 5001);
+        entrada = new BufferedReader(
+                new InputStreamReader(socket.getInputStream()));
+        saida = new PrintWriter(socket.getOutputStream(), true);
+
+        System.out.println(entrada.readLine());
+
+        saida.println("LOGIN;lucas@email.com;123");
         System.out.println(entrada.readLine());
 
         saida.println("SOLICITAR_ATENDIMENTO;lucas@email.com;joao@email.com");

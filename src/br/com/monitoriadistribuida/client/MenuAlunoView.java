@@ -2,6 +2,9 @@ package br.com.monitoriadistribuida.client;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -9,6 +12,8 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -20,9 +25,15 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 
+import br.com.monitoriadistribuida.network.InformacoesMonitor;
 import br.com.monitoriadistribuida.server.model.Disciplina;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MenuAlunoView extends JFrame {
 
@@ -30,8 +41,10 @@ public class MenuAlunoView extends JFrame {
     private final SessionContext session;
     private final AlunoController controller = new AlunoController();
     private final JComboBox<Disciplina> disciplinaCombo = new JComboBox<>();
-    private final JTextField emailMonitorField = SwingUtils.createTextField("E-mail do monitor");
     private final JTextArea respostaArea = SwingUtils.createTextArea();
+    private final JPanel resultadoPanel = new JPanel(new BorderLayout());
+    private volatile List<InformacoesMonitor> monitoresExibidos = new ArrayList<>();
+    private volatile boolean solicitacaoEmAndamento;
 
     public MenuAlunoView(JFrame loginFrame, SessionContext session) {
         this.loginFrame = loginFrame;
@@ -91,7 +104,7 @@ public class MenuAlunoView extends JFrame {
         left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
 
         JLabel title = SwingUtils.createTitle("Menu do aluno");
-        JLabel subtitle = new JLabel("Bem-vindo, " + session.getNome() + ". Aqui voce consulta disciplinas e solicita monitor.");
+        JLabel subtitle = new JLabel("Bem-vindo, " + session.getNome() + ". Aqui você consulta disciplinas e solicita monitor.");
         subtitle.setForeground(SwingUtils.MUTED);
         subtitle.setFont(subtitle.getFont().deriveFont(15f));
 
@@ -99,7 +112,7 @@ public class MenuAlunoView extends JFrame {
         left.add(Box.createVerticalStrut(4));
         left.add(subtitle);
 
-        JLabel badge = new JLabel("Sessao: ALUNO");
+        JLabel badge = new JLabel("Sessão: ALUNO");
         badge.setOpaque(true);
         badge.setBackground(new Color(219, 234, 254));
         badge.setForeground(SwingUtils.PRIMARY_DARK);
@@ -123,17 +136,15 @@ public class MenuAlunoView extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.insets = new Insets(0, 0, 12, 0);
 
-        JLabel section = SwingUtils.createSectionLabel("Acoes do aluno");
+        JLabel section = SwingUtils.createSectionLabel("Ações do aluno");
         section.setFont(section.getFont().deriveFont(Font.BOLD, 20f));
 
         JButton listarDisciplinasButton = SwingUtils.createSecondaryButton("Listar disciplinas");
         JButton buscarMonitoresButton = SwingUtils.createPrimaryButton("Buscar monitores");
-        JButton solicitarButton = SwingUtils.createPrimaryButton("Solicitar atendimento");
         JButton sairButton = SwingUtils.createGhostButton("Sair da conta");
 
         listarDisciplinasButton.addActionListener(e -> mostrarDisciplinas());
         buscarMonitoresButton.addActionListener(e -> buscarMonitores());
-        solicitarButton.addActionListener(e -> solicitarAtendimento());
         sairButton.addActionListener(e -> sairConta());
 
         gbc.gridy = 0;
@@ -141,13 +152,9 @@ public class MenuAlunoView extends JFrame {
         gbc.gridy++;
         inner.add(labeledField("Disciplina", disciplinaCombo), gbc);
         gbc.gridy++;
-        inner.add(labeledField("E-mail do monitor", emailMonitorField), gbc);
-        gbc.gridy++;
         inner.add(listarDisciplinasButton, gbc);
         gbc.gridy++;
         inner.add(buscarMonitoresButton, gbc);
-        gbc.gridy++;
-        inner.add(solicitarButton, gbc);
         gbc.gridy++;
         inner.add(sairButton, gbc);
         gbc.gridy++;
@@ -165,8 +172,9 @@ public class MenuAlunoView extends JFrame {
         JLabel section = SwingUtils.createSectionLabel("Resultado");
         section.setFont(section.getFont().deriveFont(Font.BOLD, 20f));
 
-        respostaArea.setText("As respostas dos comandos do backend aparecerão aqui.");
         respostaArea.setRows(18);
+        resultadoPanel.setBackground(new Color(248, 250, 252));
+        mostrarTextoResultado("As respostas dos comandos do servidor central aparecerão aqui.");
 
         JPanel chips = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         chips.setOpaque(false);
@@ -175,7 +183,7 @@ public class MenuAlunoView extends JFrame {
         chips.add(createChip("Atendimento"));
 
         card.add(section, BorderLayout.NORTH);
-        card.add(new JScrollPane(respostaArea), BorderLayout.CENTER);
+        card.add(SwingUtils.createScrollPane(resultadoPanel), BorderLayout.CENTER);
         card.add(chips, BorderLayout.SOUTH);
         return card;
     }
@@ -203,11 +211,11 @@ public class MenuAlunoView extends JFrame {
     }
 
     private void mostrarDisciplinas() {
-        StringBuilder builder = new StringBuilder("Disciplinas retornadas pelo backend:\n\n");
+        StringBuilder builder = new StringBuilder("Disciplinas retornadas pelo servidor central:\n\n");
         for (Disciplina disciplina : controller.listarDisciplinas()) {
             builder.append("• ").append(disciplina.getNomeExibicao()).append('\n');
         }
-        respostaArea.setText(builder.toString());
+        mostrarTextoResultado(builder.toString());
     }
 
     private void buscarMonitores() {
@@ -216,23 +224,208 @@ public class MenuAlunoView extends JFrame {
             SwingUtils.showWarning(this, "Busca", "Selecione uma disciplina.");
             return;
         }
-        respostaArea.setText(controller.listarMonitoresPorDisciplina(disciplina));
+
+        mostrarTextoResultado("Buscando monitores disponíveis...");
+
+        executarEmSegundoPlano("thread-busca-monitores", () -> {
+            List<InformacoesMonitor> monitores = controller.listarMonitoresPorDisciplina(
+                    session.getConexaoServidor(),
+                    disciplina);
+            SwingUtilities.invokeLater(() -> mostrarMonitores(monitores));
+        });
     }
 
-    private void solicitarAtendimento() {
-        String emailMonitor = emailMonitorField.getText().trim();
-        if (emailMonitor.isEmpty()) {
-            SwingUtils.showWarning(this, "Atendimento", "Informe o e-mail do monitor.");
+    private void solicitarAtendimento(InformacoesMonitor monitor) {
+        if (monitor == null) {
             return;
         }
-        respostaArea.setText(controller.solicitarAtendimento(session.getLogin(), emailMonitor));
-        SwingUtils.showInfo(this, "Atendimento", "Solicitacao preparada.");
+
+        if (solicitacaoEmAndamento) {
+            SwingUtils.showWarning(this, "Atendimento", "Aguarde a solicitação em andamento.");
+            return;
+        }
+
+        solicitacaoEmAndamento = true;
+        mostrarTextoResultado("Solicitando atendimento para " + monitor.getNome() + "...");
+
+        Thread thread = new Thread(() -> {
+            try {
+                InformacoesMonitor atendimento = controller.solicitarAtendimento(
+                    session.getConexaoServidor(),
+                    session.getLogin(),
+                    monitor.getEmail());
+                SwingUtilities.invokeLater(() -> {
+                    solicitacaoEmAndamento = false;
+                    abrirChatComMonitor(atendimento);
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    solicitacaoEmAndamento = false;
+                    SwingUtils.showError(this, "Atendimento", ex.getMessage());
+                    mostrarMonitores(monitoresExibidos);
+                });
+            }
+        }, "thread-solicitar-atendimento");
+
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void mostrarMonitores(List<InformacoesMonitor> monitores) {
+        if (monitores == null || monitores.isEmpty()) {
+            monitoresExibidos = new ArrayList<>();
+            mostrarTextoResultado("Nenhum monitor disponível para a disciplina selecionada.");
+            return;
+        }
+
+        monitoresExibidos = new ArrayList<>(monitores);
+
+        JPanel lista = new JPanel();
+        lista.setOpaque(false);
+        lista.setLayout(new BoxLayout(lista, BoxLayout.Y_AXIS));
+
+        JLabel titulo = SwingUtils.createSectionLabel("Monitores disponíveis");
+        titulo.setBorder(new EmptyBorder(0, 0, 12, 0));
+        lista.add(titulo);
+
+        for (InformacoesMonitor monitor : monitores) {
+            lista.add(criarCardMonitor(monitor));
+            lista.add(Box.createVerticalStrut(10));
+        }
+
+        resultadoPanel.removeAll();
+        resultadoPanel.add(lista, BorderLayout.NORTH);
+        atualizarResultado();
+    }
+
+    private void abrirChatComMonitor(InformacoesMonitor monitor) {
+        if (monitor.getPortaChat() <= 0) {
+            SwingUtils.showError(this, "Atendimento", "O monitor não informou uma porta de chat válida.");
+            return;
+        }
+
+        mostrarTextoResultado("Atendimento iniciado com " + monitor.getNome()
+                + "\nIP: " + monitor.getIp()
+                + "\nPorta chat: " + monitor.getPortaChat());
+
+        setVisible(false);
+        SwingUtils.exibirCentralizado(new ChatView(
+                this,
+                session,
+                monitor.getNome(),
+                monitor.getDisciplina(),
+                monitor.getIp(),
+                monitor.getPortaChat()));
+    }
+
+    private void executarEmSegundoPlano(String nomeThread, AcaoServidor acaoServidor) {
+        Thread thread = new Thread(() -> {
+            try {
+                acaoServidor.executar();
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> SwingUtils.showError(this, "Servidor", ex.getMessage()));
+            }
+        }, nomeThread);
+
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private JPanel criarCardMonitor(InformacoesMonitor monitor) {
+        JPanel card = new JPanel(new BorderLayout(14, 0));
+        card.setOpaque(true);
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(203, 213, 225), 1, true),
+                new EmptyBorder(14, 16, 14, 16)));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 112));
+
+        JPanel textos = new JPanel();
+        textos.setOpaque(false);
+        textos.setLayout(new BoxLayout(textos, BoxLayout.Y_AXIS));
+
+        JLabel nomeLabel = new JLabel(monitor.getNome());
+        nomeLabel.setForeground(SwingUtils.TEXT);
+        nomeLabel.setFont(nomeLabel.getFont().deriveFont(Font.BOLD, 16f));
+
+        JLabel disciplinaLabel = new JLabel(monitor.getDisciplina());
+        disciplinaLabel.setForeground(SwingUtils.MUTED);
+        disciplinaLabel.setFont(disciplinaLabel.getFont().deriveFont(Font.PLAIN, 13f));
+
+        JLabel emailLabel = new JLabel(monitor.getEmail());
+        emailLabel.setForeground(SwingUtils.MUTED);
+        emailLabel.setFont(emailLabel.getFont().deriveFont(Font.PLAIN, 13f));
+
+        textos.add(nomeLabel);
+        textos.add(Box.createVerticalStrut(4));
+        textos.add(disciplinaLabel);
+        textos.add(Box.createVerticalStrut(3));
+        textos.add(emailLabel);
+
+        JLabel acaoLabel = new JLabel("Solicitar");
+        acaoLabel.setOpaque(true);
+        acaoLabel.setBackground(new Color(219, 234, 254));
+        acaoLabel.setForeground(SwingUtils.PRIMARY_DARK);
+        acaoLabel.setFont(acaoLabel.getFont().deriveFont(Font.BOLD, 13f));
+        acaoLabel.setBorder(new EmptyBorder(8, 12, 8, 12));
+
+        MouseAdapter cliqueCard = new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                solicitarAtendimento(monitor);
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                card.setBackground(new Color(248, 250, 252));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                card.setBackground(Color.WHITE);
+            }
+        };
+
+        card.add(textos, BorderLayout.CENTER);
+        card.add(acaoLabel, BorderLayout.EAST);
+        aplicarCliqueCard(card, cliqueCard);
+        return card;
+    }
+
+    private void aplicarCliqueCard(Component componente, MouseAdapter cliqueCard) {
+        componente.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        componente.addMouseListener(cliqueCard);
+
+        if (componente instanceof Container) {
+            Component[] filhos = ((Container) componente).getComponents();
+
+            for (Component filho : filhos) {
+                aplicarCliqueCard(filho, cliqueCard);
+            }
+        }
+    }
+
+    private void mostrarTextoResultado(String texto) {
+        respostaArea.setText(texto);
+        resultadoPanel.removeAll();
+        resultadoPanel.add(respostaArea, BorderLayout.CENTER);
+        atualizarResultado();
+    }
+
+    private void atualizarResultado() {
+        resultadoPanel.revalidate();
+        resultadoPanel.repaint();
     }
 
     private void sairConta() {
+        session.fecharConexaoServidor();
         dispose();
         if (loginFrame != null) {
-            loginFrame.setVisible(true);
+            SwingUtils.exibirCentralizado(loginFrame);
         }
+    }
+
+    private interface AcaoServidor {
+        void executar() throws Exception;
     }
 }

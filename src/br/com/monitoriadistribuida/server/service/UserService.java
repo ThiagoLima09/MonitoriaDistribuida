@@ -1,15 +1,22 @@
 package br.com.monitoriadistribuida.server.service;
 
 import br.com.monitoriadistribuida.server.model.Usuario;
+import br.com.monitoriadistribuida.server.repository.UsuarioRepositorioMySql;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.sql.SQLException;
 
 public class UserService {
 
-    private Map<String, Usuario> usuarios = new ConcurrentHashMap<>();
+    private final UsuarioRepositorioMySql usuarioRepositorio;
+
+    public UserService() {
+        try {
+            usuarioRepositorio = new UsuarioRepositorioMySql();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Não foi possível conectar ao banco de dados MySQL.", e);
+        }
+    }
 
     public boolean cadastrar(Usuario usuario) {
 
@@ -23,9 +30,11 @@ public class UserService {
             return false;
         }
 
-        Usuario usuarioExistente = usuarios.putIfAbsent(email, usuario);
-
-        return usuarioExistente == null;
+        try {
+            return usuarioRepositorio.cadastrar(usuario);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Falha ao cadastrar usuário no banco de dados.", e);
+        }
     }
 
     public Usuario login(String email, String senha) {
@@ -34,21 +43,19 @@ public class UserService {
             return null;
         }
 
-        Usuario usuario = usuarios.get(email);
-
-        if (usuario == null) {
-            return null;
+        try {
+            return usuarioRepositorio.login(email, senha);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Falha ao consultar login no banco de dados.", e);
         }
-
-        if (!usuario.getSenha().equals(senha)) {
-            return null;
-        }
-
-        return usuario;
     }
 
     public List<Usuario> listarUsuarios() {
-        return new ArrayList<>(usuarios.values());
+        try {
+            return usuarioRepositorio.listarUsuarios();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Falha ao listar usuários no banco de dados.", e);
+        }
     }
 
     public Usuario buscarPorEmail(String email) {
@@ -56,6 +63,10 @@ public class UserService {
             return null;
         }
 
-        return usuarios.get(email);
+        try {
+            return usuarioRepositorio.buscarPorEmail(email);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Falha ao buscar usuário no banco de dados.", e);
+        }
     }
 }

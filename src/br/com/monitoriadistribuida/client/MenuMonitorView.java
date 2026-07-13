@@ -20,7 +20,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 import br.com.monitoriadistribuida.server.model.Disciplina;
 import br.com.monitoriadistribuida.server.model.StatusMonitor;
@@ -31,10 +31,10 @@ public class MenuMonitorView extends JFrame {
     private final SessionContext session;
     private final MonitorController controller = new MonitorController();
     private final JComboBox<Disciplina> disciplinaCombo = new JComboBox<>();
-    private final JTextField portaField = SwingUtils.createTextField("Porta do monitor");
     private final JTextArea respostaArea = SwingUtils.createTextArea();
     private final JLabel statusAtualLabel = new JLabel();
     private StatusMonitor statusAtual = StatusMonitor.OFFLINE;
+    private ChatView chatAtendimento;
 
     public MenuMonitorView(JFrame loginFrame, SessionContext session) {
         this.loginFrame = loginFrame;
@@ -97,7 +97,7 @@ public class MenuMonitorView extends JFrame {
         left.add(Box.createVerticalStrut(4));
         left.add(subtitle);
 
-        JLabel badge = new JLabel("Sessao: MONITOR");
+        JLabel badge = new JLabel("Sessão: MONITOR");
         badge.setOpaque(true);
         badge.setBackground(new Color(254, 243, 199));
         badge.setForeground(new Color(146, 64, 14));
@@ -121,10 +121,10 @@ public class MenuMonitorView extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.insets = new Insets(0, 0, 12, 0);
 
-        JLabel section = SwingUtils.createSectionLabel("Atualizacao do monitor");
+        JLabel section = SwingUtils.createSectionLabel("Atualização do monitor");
         section.setFont(section.getFont().deriveFont(Font.BOLD, 20f));
 
-        JButton disponivelButton = SwingUtils.createPrimaryButton("Ficar disponivel");
+        JButton disponivelButton = SwingUtils.createPrimaryButton("Ficar disponível");
         JButton ocupadoButton = SwingUtils.createSecondaryButton("Ficar ocupado");
         JButton offlineButton = SwingUtils.createGhostButton("Ficar offline");
         JButton sairButton = SwingUtils.createGhostButton("Sair da conta");
@@ -140,8 +140,6 @@ public class MenuMonitorView extends JFrame {
         inner.add(labeledField("Disciplina", disciplinaCombo), gbc);
         gbc.gridy++;
         inner.add(createStatusPanel(), gbc);
-        gbc.gridy++;
-        inner.add(labeledField("Porta", portaField), gbc);
         gbc.gridy++;
         inner.add(disponivelButton, gbc);
         gbc.gridy++;
@@ -159,9 +157,8 @@ public class MenuMonitorView extends JFrame {
     }
 
     private JPanel createStatusPanel() {
-        JPanel panel = new JPanel();
+        JPanel panel = new JPanel(new BorderLayout(0, 6));
         panel.setOpaque(false);
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 
         JLabel label = new JLabel("Status atual");
         label.setForeground(SwingUtils.TEXT);
@@ -170,10 +167,10 @@ public class MenuMonitorView extends JFrame {
         statusAtualLabel.setOpaque(true);
         statusAtualLabel.setHorizontalAlignment(JLabel.CENTER);
         statusAtualLabel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        statusAtualLabel.setPreferredSize(new Dimension(300, 40));
 
-        panel.add(label);
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(statusAtualLabel);
+        panel.add(label, BorderLayout.NORTH);
+        panel.add(statusAtualLabel, BorderLayout.CENTER);
         atualizarPillStatus();
         return panel;
     }
@@ -192,7 +189,6 @@ public class MenuMonitorView extends JFrame {
         chips.setOpaque(false);
         chips.add(createChip("Status"));
         chips.add(createChip("Disciplina"));
-        chips.add(createChip("Porta"));
 
         card.add(section, BorderLayout.NORTH);
         card.add(new JScrollPane(respostaArea), BorderLayout.CENTER);
@@ -210,16 +206,15 @@ public class MenuMonitorView extends JFrame {
     }
 
     private JPanel labeledField(String labelText, java.awt.Component field) {
-        JPanel panel = new JPanel();
+        JPanel panel = new JPanel(new BorderLayout(0, 6));
         panel.setOpaque(false);
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         JLabel label = new JLabel(labelText);
         label.setForeground(SwingUtils.TEXT);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
         field.setPreferredSize(new Dimension(300, 40));
-        panel.add(label);
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(field);
+        field.setMinimumSize(new Dimension(300, 40));
+        panel.add(label, BorderLayout.NORTH);
+        panel.add(field, BorderLayout.CENTER);
         return panel;
     }
 
@@ -230,18 +225,76 @@ public class MenuMonitorView extends JFrame {
             return;
         }
 
-        int porta;
-        try {
-            porta = Integer.parseInt(portaField.getText().trim());
-        } catch (NumberFormatException ex) {
-            SwingUtils.showWarning(this, "Status", "Informe uma porta valida.");
-            return;
+        ChatView novoChat = null;
+        int portaChat = 0;
+
+        if (status == StatusMonitor.DISPONIVEL) {
+            novoChat = abrirChatDeEspera(disciplina);
+            if (novoChat == null) {
+                return;
+            }
+            portaChat = novoChat.getPortaLocal();
+        }
+
+        ChatView chatParaAtivar = novoChat;
+        int portaFinal = portaChat;
+        respostaArea.setText("Atualizando status no servidor central...");
+
+        executarEmSegundoPlano("thread-atualizar-status-monitor", () -> {
+            String resposta = controller.atualizarStatus(
+                    session.getConexaoServidor(),
+                    session.getLogin(),
+                    status,
+                    disciplina,
+                    portaFinal);
+            SwingUtilities.invokeLater(() -> concluirAtualizacaoStatus(status, resposta, chatParaAtivar));
+        }, chatParaAtivar);
+    }
+
+    private ChatView abrirChatDeEspera(Disciplina disciplina) {
+        ChatView chat = new ChatView(this, session, "Aluno", 0, disciplina.getNomeExibicao());
+
+        if (chat.getPortaLocal() <= 0) {
+            chat.dispose();
+            SwingUtils.showError(this, "Chat", "Não foi possível abrir uma porta P2P para o chat.");
+            return null;
+        }
+
+        return chat;
+    }
+
+    private void concluirAtualizacaoStatus(StatusMonitor status, String resposta, ChatView novoChat) {
+        if (status != StatusMonitor.DISPONIVEL) {
+            fecharChatAtendimento();
+        } else {
+            fecharChatAtendimento();
+            chatAtendimento = novoChat;
+            setVisible(false);
+            SwingUtils.exibirCentralizado(chatAtendimento);
         }
 
         statusAtual = status;
         atualizarPillStatus();
-        respostaArea.setText(controller.atualizarStatus(session.getLogin(), status, disciplina, porta));
-        SwingUtils.showInfo(this, "Status", "Status preparado para o backend.");
+        respostaArea.setText(resposta);
+        SwingUtils.showInfo(this, "Status", "Status atualizado no servidor central.");
+    }
+
+    private void executarEmSegundoPlano(String nomeThread, AcaoServidor acaoServidor, ChatView chatParaFecharEmErro) {
+        Thread thread = new Thread(() -> {
+            try {
+                acaoServidor.executar();
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    if (chatParaFecharEmErro != null) {
+                        chatParaFecharEmErro.dispose();
+                    }
+                    SwingUtils.showError(this, "Servidor", ex.getMessage());
+                });
+            }
+        }, nomeThread);
+
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void atualizarPillStatus() {
@@ -264,9 +317,22 @@ public class MenuMonitorView extends JFrame {
     }
 
     private void sairConta() {
+        fecharChatAtendimento();
+        session.fecharConexaoServidor();
         dispose();
         if (loginFrame != null) {
-            loginFrame.setVisible(true);
+            SwingUtils.exibirCentralizado(loginFrame);
         }
+    }
+
+    private void fecharChatAtendimento() {
+        if (chatAtendimento != null) {
+            chatAtendimento.dispose();
+            chatAtendimento = null;
+        }
+    }
+
+    private interface AcaoServidor {
+        void executar() throws Exception;
     }
 }
