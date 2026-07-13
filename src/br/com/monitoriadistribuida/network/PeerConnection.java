@@ -77,6 +77,14 @@ public class PeerConnection implements Closeable {
         return conectado && socket != null && socket.isConnected() && !socket.isClosed();
     }
 
+    public String getEnderecoPar() {
+        if (socket == null || socket.getInetAddress() == null) {
+            return null;
+        }
+
+        return socket.getInetAddress().getHostAddress();
+    }
+
     public void sendMessage(String mensagem) throws IOException {
         enviarMensagem(mensagem);
     }
@@ -160,6 +168,7 @@ public class PeerConnection implements Closeable {
         conectado = true;
 
         iniciarThreadLeitura();
+        notificarOuvinte("CONTROLE;CONEXAO_ESTABELECIDA");
     }
 
     private void iniciarThreadLeitura() {
@@ -174,6 +183,9 @@ public class PeerConnection implements Closeable {
 
                     if (mensagem == null) {
                         conectado = false;
+                        if (executando) {
+                            notificarOuvinte("CONTROLE;CONEXAO_ENCERRADA");
+                        }
                         break;
                     }
 
