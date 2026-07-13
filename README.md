@@ -33,24 +33,8 @@ Por padrao, o servidor tenta conectar em:
 
 ```text
 jdbc:mysql://localhost:3306/monitoria
-usuario: root
-senha: vazia
 ```
 
-Se seu MySQL usa outro usuario ou senha, informe por variaveis de ambiente:
-
-```bash
-MONITORIA_DB_USUARIO=root MONITORIA_DB_SENHA=sua_senha mvn exec:java -Dexec.mainClass=br.com.monitoriadistribuida.server.ServerMain
-```
-
-Tambem e possivel sobrescrever a URL:
-
-```bash
-MONITORIA_DB_URL="jdbc:mysql://localhost:3306/monitoria?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8" \
-MONITORIA_DB_USUARIO=root \
-MONITORIA_DB_SENHA=sua_senha \
-mvn exec:java -Dexec.mainClass=br.com.monitoriadistribuida.server.ServerMain
-```
 
 ## Como executar
 
@@ -122,17 +106,4 @@ recursos de conversa acontecem diretamente entre clientes:
 O monitor abre portas dinamicas para receber conexoes P2P. O servidor central
 repassa essas portas para o aluno durante a solicitacao de atendimento.
 
-## Observacoes sobre webcam no macOS
-
-Em macOS com Apple Silicon, execute pelo Maven para garantir o carregamento das
-dependencias nativas do JavaCV/FFmpeg:
-
-```bash
-mvn exec:java -Dexec.mainClass=br.com.monitoriadistribuida.client.ClientMain -Dorg.bytedeco.javacpp.platform=macosx-arm64
-```
-
-Se a webcam nao abrir, verifique a permissao de camera em:
-
-```text
-Ajustes do Sistema > Privacidade e Seguranca > Camera
 ```
