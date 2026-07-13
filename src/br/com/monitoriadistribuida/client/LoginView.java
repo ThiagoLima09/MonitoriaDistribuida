@@ -16,18 +16,15 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
-import javax.swing.JComboBox;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
-
-import br.com.monitoriadistribuida.server.model.TipoUsuario;
+import javax.swing.SwingUtilities;
 
 public class LoginView extends JFrame {
 
     private final LoginController controller = new LoginController();
     private final JTextField emailField = SwingUtils.createTextField("E-mail");
     private final JPasswordField senhaField = SwingUtils.createPasswordField("Senha");
-    private final JComboBox<TipoUsuario> tipoCombo = new JComboBox<>(TipoUsuario.values());
 
     public LoginView() {
         buildView();
@@ -65,7 +62,7 @@ public class LoginView extends JFrame {
         title.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel subtitle = new JLabel(
-                "<html><div style='width:330px'>Entre com seu e-mail e senha para acessar as telas já suportadas pelo backend: cadastro, consulta de disciplinas, busca de monitores e atualização de status.</div></html>");
+                "<html><div style='width:330px'>Entre com seu e-mail e senha para acessar as telas conectadas ao servidor central: cadastro, consulta de disciplinas, busca de monitores e atualização de status.</div></html>");
         subtitle.setForeground(SwingUtils.MUTED);
         subtitle.setFont(subtitle.getFont().deriveFont(16f));
         subtitle.setAlignmentX(LEFT_ALIGNMENT);
@@ -78,7 +75,7 @@ public class LoginView extends JFrame {
         panel.add(Box.createVerticalStrut(28));
         panel.add(createFeatureLabel("Login por e-mail e senha"));
         panel.add(createFeatureLabel("Cadastro de aluno ou monitor"));
-        panel.add(createFeatureLabel("Menus alinhados ao backend"));
+        panel.add(createFeatureLabel("Menus alinhados ao servidor central"));
         panel.add(Box.createVerticalGlue());
 
         return panel;
@@ -97,7 +94,6 @@ public class LoginView extends JFrame {
         JPanel card = SwingUtils.createCardPanel();
         card.setPreferredSize(new Dimension(360, 0));
         card.setLayout(new GridBagLayout());
-        SwingUtils.styleComboBox(tipoCombo);
 
         JPanel inner = new JPanel(new GridBagLayout());
         inner.setOpaque(false);
@@ -111,10 +107,10 @@ public class LoginView extends JFrame {
         JLabel title = SwingUtils.createSectionLabel("Entrar");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 20f));
 
-        JLabel helper = new JLabel("Use o mesmo e-mail cadastrado no backend.");
+        JLabel helper = new JLabel("Use o mesmo e-mail cadastrado no servidor central.");
         helper.setForeground(SwingUtils.MUTED);
 
-        JLabel profileHint = new JLabel("Selecione seu perfil de acesso antes de entrar.");
+        JLabel profileHint = new JLabel("O servidor central identifica se você é aluno ou monitor.");
         profileHint.setForeground(new Color(146, 64, 14));
         profileHint.setOpaque(true);
         profileHint.setBackground(new Color(255, 247, 237));
@@ -139,9 +135,6 @@ public class LoginView extends JFrame {
         inner.add(labeledField("Senha", senhaField), gbc);
 
         gbc.gridy++;
-        inner.add(labeledField("Tipo de usuario", tipoCombo), gbc);
-
-        gbc.gridy++;
         inner.add(entrarButton, gbc);
 
         gbc.gridy++;
@@ -153,7 +146,6 @@ public class LoginView extends JFrame {
 
         card.add(inner, new GridBagConstraints());
 
-        tipoCombo.setSelectedIndex(-1);
         entrarButton.addActionListener(e -> handleLogin());
         cadastroButton.addActionListener(e -> openCadastro());
         return card;
@@ -174,25 +166,33 @@ public class LoginView extends JFrame {
     }
 
     private void handleLogin() {
-        try {
-            SessionContext session = controller.authenticate(
-                    emailField.getText(),
-                    new String(senhaField.getPassword()),
-                    (TipoUsuario) tipoCombo.getSelectedItem());
+        String email = emailField.getText();
+        String senha = new String(senhaField.getPassword());
 
-            setVisible(false);
-            if (session.getTipoUsuario() == br.com.monitoriadistribuida.server.model.TipoUsuario.MONITOR) {
-                new MenuMonitorView(this, session).setVisible(true);
-            } else {
-                new MenuAlunoView(this, session).setVisible(true);
+        Thread threadLogin = new Thread(() -> {
+            try {
+                SessionContext session = controller.autenticar(email, senha);
+                SwingUtilities.invokeLater(() -> abrirMenuUsuario(session));
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> SwingUtils.showError(this, "Login", ex.getMessage()));
             }
-        } catch (IllegalArgumentException ex) {
-            SwingUtils.showError(this, "Login", ex.getMessage());
+        }, "thread-login-servidor");
+
+        threadLogin.setDaemon(true);
+        threadLogin.start();
+    }
+
+    private void abrirMenuUsuario(SessionContext session) {
+        setVisible(false);
+        if (session.getTipoUsuario() == br.com.monitoriadistribuida.server.model.TipoUsuario.MONITOR) {
+            SwingUtils.exibirCentralizado(new MenuMonitorView(this, session));
+        } else {
+            SwingUtils.exibirCentralizado(new MenuAlunoView(this, session));
         }
     }
 
     private void openCadastro() {
         setVisible(false);
-        new CadastroView(this).setVisible(true);
+        SwingUtils.exibirCentralizado(new CadastroView(this));
     }
 }
