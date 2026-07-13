@@ -1,39 +1,36 @@
 package br.com.monitoriadistribuida.client;
 
-import br.com.monitoriadistribuida.server.model.TipoUsuario;
+import br.com.monitoriadistribuida.network.ResultadoLogin;
+import br.com.monitoriadistribuida.network.ServerConnection;
+
+import java.io.IOException;
 
 public class LoginController {
 
-    public SessionContext authenticate(String email, String senha, TipoUsuario tipoUsuario) {
-        String normalizedEmail = normalize(email);
-        String normalizedSenha = normalize(senha);
+    public SessionContext autenticar(String email, String senha) throws IOException {
+        String emailNormalizado = normalizar(email);
+        String senhaNormalizada = normalizar(senha);
 
-        if (normalizedEmail.isEmpty()) {
+        if (emailNormalizado.isEmpty()) {
             throw new IllegalArgumentException("Informe o e-mail.");
         }
 
-        if (normalizedSenha.isEmpty()) {
+        if (senhaNormalizada.isEmpty()) {
             throw new IllegalArgumentException("Informe a senha.");
         }
 
-        if (tipoUsuario == null) {
-            throw new IllegalArgumentException("Selecione o tipo de usuario.");
-        }
+        ServerConnection conexaoServidor = new ServerConnection();
 
-        return new SessionContext(buildDisplayName(normalizedEmail), normalizedEmail, tipoUsuario);
+        try {
+            ResultadoLogin resultado = conexaoServidor.login(emailNormalizado, senhaNormalizada);
+            return new SessionContext(resultado.getNome(), emailNormalizado, resultado.getTipoUsuario(), conexaoServidor);
+        } catch (IOException | RuntimeException e) {
+            conexaoServidor.close();
+            throw e;
+        }
     }
 
-    private String buildDisplayName(String email) {
-        int atIndex = email.indexOf('@');
-        String base = atIndex > 0 ? email.substring(0, atIndex) : email;
-        base = base.replace('.', ' ').replace('_', ' ').trim();
-        if (base.isEmpty()) {
-            return "Usuario";
-        }
-        return Character.toUpperCase(base.charAt(0)) + base.substring(1);
-    }
-
-    private String normalize(String value) {
+    private String normalizar(String value) {
         return value == null ? "" : value.trim();
     }
 }
