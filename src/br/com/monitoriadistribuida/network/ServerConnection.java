@@ -58,7 +58,7 @@ public class ServerConnection implements Closeable {
             throw new IOException("Resposta inválida para LOGIN: " + resposta);
         }
 
-        return new ResultadoLogin(TipoUsuario.valueOf(partes[2]), partes[3]);
+        return new ResultadoLogin(TipoUsuario.fromTexto(partes[2]), partes[3]);
     }
 
     public void cadastrar(String nome, String email, String senha, TipoUsuario tipoUsuario) throws IOException {
@@ -100,13 +100,13 @@ public class ServerConnection implements Closeable {
                 + normalizar(emailMonitor));
         String[] partes = separarResposta(resposta);
 
-        if (partes.length < 7 || !"OK".equals(partes[0]) || !"ATENDIMENTO".equals(partes[1])) {
+        if (partes.length < 9 || !"OK".equals(partes[0]) || !"ATENDIMENTO".equals(partes[1])) {
             throw new IOException("Resposta inválida para SOLICITAR_ATENDIMENTO: " + resposta);
         }
 
         int portaChat = converterInteiro(partes[6], "portaChat");
-        int portaVideo = partes.length > 7 ? converterInteiro(partes[7], "portaVideo") : 0;
-        int portaAudio = partes.length > 8 ? converterInteiro(partes[8], "portaAudio") : 0;
+        int portaVideo = converterInteiro(partes[7], "portaVideo");
+        int portaAudio = converterInteiro(partes[8], "portaAudio");
 
         return new InformacoesMonitor(partes[2], partes[3], partes[4], partes[5], portaChat, portaVideo, portaAudio);
     }
