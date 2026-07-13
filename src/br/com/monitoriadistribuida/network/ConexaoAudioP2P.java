@@ -29,8 +29,10 @@ public class ConexaoAudioP2P implements Closeable {
 
     private volatile boolean executando;
     private volatile boolean conectado;
-    private volatile boolean audioSolicitado;
-    private volatile boolean audioExecutando;
+    private volatile boolean escutaSolicitada;
+    private volatile boolean escutaExecutando;
+    private volatile boolean microfoneSolicitado;
+    private volatile boolean microfoneAtivo;
 
     private ServerSocket socketServidor;
     private Socket socket;
@@ -83,20 +85,44 @@ public class ConexaoAudioP2P implements Closeable {
     }
 
     public synchronized void iniciarAudio() {
-        audioSolicitado = true;
+        iniciarEscuta();
+        ativarMicrofone();
+    }
 
-        if (!estaConectado() || audioExecutando) {
+    public synchronized void iniciarEscuta() {
+        escutaSolicitada = true;
+
+        if (!estaConectado() || escutaExecutando) {
             return;
         }
 
-        audioExecutando = true;
-        iniciarThreadCaptura();
+        escutaExecutando = true;
         iniciarThreadReproducao();
     }
 
+    public synchronized void ativarMicrofone() {
+        microfoneSolicitado = true;
+
+        if (!estaConectado() || microfoneAtivo) {
+            return;
+        }
+
+        microfoneAtivo = true;
+        iniciarThreadCaptura();
+    }
+
+    public synchronized void silenciarMicrofone() {
+        microfoneSolicitado = false;
+        microfoneAtivo = false;
+        fecharMicrofone();
+        interromperThread(threadCaptura);
+    }
+
     public synchronized void pararAudio() {
-        audioSolicitado = false;
-        audioExecutando = false;
+        escutaSolicitada = false;
+        escutaExecutando = false;
+        microfoneSolicitado = false;
+        microfoneAtivo = false;
         fecharMicrofone();
         fecharAltoFalante();
         interromperThread(threadCaptura);
@@ -157,23 +183,31 @@ public class ConexaoAudioP2P implements Closeable {
         saida = new DataOutputStream(socket.getOutputStream());
         conectado = true;
 
-        if (audioSolicitado) {
-            iniciarAudio();
+        if (escutaSolicitada) {
+            iniciarEscuta();
+        }
+
+        if (microfoneSolicitado) {
+            ativarMicrofone();
         }
     }
 
     private void iniciarThreadCaptura() {
         threadCaptura = new Thread(() -> {
+            TargetDataLine linhaCaptura = null;
+
             try {
-                linhaMicrofone = abrirLinhaMicrofone();
+                linhaCaptura = abrirLinhaMicrofone();
+                linhaMicrofone = linhaCaptura;
+
                 byte[] buffer = new byte[TAMANHO_PACOTE_AUDIO_BYTES];
 
                 while (true) {
-                    if (!executando || !audioExecutando) {
+                    if (!executando || !microfoneAtivo) {
                         break;
                     }
 
-                    int lidos = linhaMicrofone.read(buffer, 0, buffer.length);
+                    int lidos = linhaCaptura.read(buffer, 0, buffer.length);
 
                     if (lidos > 0) {
                         enviarPacoteAudio(buffer, lidos);
@@ -182,11 +216,11 @@ public class ConexaoAudioP2P implements Closeable {
             } catch (LineUnavailableException e) {
                 ouvinte.aoOcorrerErroAudio("Microfone indisponível: " + e.getMessage());
             } catch (IOException | RuntimeException e) {
-                if (executando && audioExecutando) {
+                if (executando && microfoneAtivo) {
                     ouvinte.aoOcorrerErroAudio("Falha ao capturar áudio: " + e.getMessage());
                 }
             } finally {
-                fecharMicrofone();
+                fecharMicrofone(linhaCaptura);
             }
         }, "thread-captura-audio");
 
@@ -200,7 +234,7 @@ public class ConexaoAudioP2P implements Closeable {
                 linhaAltoFalante = abrirLinhaAltoFalante();
 
                 while (true) {
-                    if (!executando || !audioExecutando) {
+                    if (!executando || !escutaExecutando) {
                         break;
                     }
 
@@ -219,7 +253,7 @@ public class ConexaoAudioP2P implements Closeable {
             } catch (LineUnavailableException e) {
                 ouvinte.aoOcorrerErroAudio("Saída de áudio indisponível: " + e.getMessage());
             } catch (IOException | RuntimeException e) {
-                if (executando && audioExecutando) {
+                if (executando && escutaExecutando) {
                     ouvinte.aoOcorrerErroAudio("Falha ao reproduzir áudio: " + e.getMessage());
                 }
             } finally {
@@ -270,11 +304,27 @@ public class ConexaoAudioP2P implements Closeable {
     }
 
     private void fecharMicrofone() {
-        if (linhaMicrofone != null) {
-            linhaMicrofone.stop();
-            linhaMicrofone.close();
+        TargetDataLine linha = linhaMicrofone;
+        linhaMicrofone = null;
+        fecharMicrofone(linha);
+    }
+
+    private void fecharMicrofone(TargetDataLine linha) {
+        if (linha == null) {
+            return;
+        }
+
+        if (linhaMicrofone == linha) {
             linhaMicrofone = null;
         }
+
+        try {
+            linha.stop();
+        } catch (RuntimeException ignored) {
+            // Fechamento em shutdown: melhor esforço.
+        }
+
+        linha.close();
     }
 
     private void fecharAltoFalante() {
