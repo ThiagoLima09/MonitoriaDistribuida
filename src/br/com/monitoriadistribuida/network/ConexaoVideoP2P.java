@@ -25,6 +25,7 @@ public class ConexaoVideoP2P implements Closeable {
 
     private static final int TEMPO_LIMITE_CONEXAO_MS = 5000;
     private static final int TAMANHO_MAXIMO_QUADRO_BYTES = 2 * 1024 * 1024;
+    private static final int CONTROLE_TRANSMISSAO_ENCERRADA = -1;
 
     private final OuvinteQuadroVideo ouvinte;
     private final Object travaSaida = new Object();
@@ -134,6 +135,17 @@ public class ConexaoVideoP2P implements Closeable {
         }
     }
 
+    public void avisarTransmissaoEncerrada() throws IOException {
+        synchronized (travaSaida) {
+            if (!estaConectado() || saida == null) {
+                throw new IOException("Nenhum par de vídeo conectado.");
+            }
+
+            saida.writeInt(CONTROLE_TRANSMISSAO_ENCERRADA);
+            saida.flush();
+        }
+    }
+
     public void enviarQuadro(BufferedImage quadro, float qualidadeJpeg) throws IOException {
         if (quadro == null) {
             throw new IllegalArgumentException("Quadro não pode ser nulo.");
@@ -219,6 +231,11 @@ public class ConexaoVideoP2P implements Closeable {
 
                 try {
                     int tamanhoQuadro = entrada.readInt();
+
+                    if (tamanhoQuadro == CONTROLE_TRANSMISSAO_ENCERRADA) {
+                        ouvinte.aoEncerrarTransmissaoVideo();
+                        continue;
+                    }
 
                     if (tamanhoQuadro <= 0 || tamanhoQuadro > TAMANHO_MAXIMO_QUADRO_BYTES) {
                         throw new IOException("Tamanho de quadro inválido: " + tamanhoQuadro);
@@ -308,7 +325,7 @@ public class ConexaoVideoP2P implements Closeable {
         try {
             fechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // Streams podem já estar fechados quando a chamada é encerrada.
         }
     }
 
@@ -320,7 +337,7 @@ public class ConexaoVideoP2P implements Closeable {
         try {
             socketFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O socket pode já ter sido fechado pela outra ponta da chamada.
         }
     }
 
@@ -332,7 +349,7 @@ public class ConexaoVideoP2P implements Closeable {
         try {
             socketServidorFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O servidor local de vídeo pode já ter parado junto com a janela de chamada.
         }
     }
 
