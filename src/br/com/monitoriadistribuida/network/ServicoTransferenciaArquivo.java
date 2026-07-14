@@ -206,7 +206,7 @@ public class ServicoTransferenciaArquivo implements Closeable {
         try {
             socketServidorFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O receptor de arquivos pode já ter sido encerrado junto com o chat.
         }
     }
 }
