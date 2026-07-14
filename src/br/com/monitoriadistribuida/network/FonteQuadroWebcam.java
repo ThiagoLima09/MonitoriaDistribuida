@@ -76,7 +76,7 @@ public class FonteQuadroWebcam implements FonteQuadroVideo, Closeable {
             capturador.stop();
             capturador.release();
         } catch (Exception ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // A webcam pode já ter sido liberada pelo driver ao encerrar a chamada.
         }
     }
 
@@ -172,7 +172,7 @@ public class FonteQuadroWebcam implements FonteQuadroVideo, Closeable {
         try {
             capturadorParaFechar.close();
         } catch (Exception ignored) {
-            // Fechamento em tentativa de fallback: melhor esforço.
+            // Se uma câmera de fallback falhar ao abrir, tentamos liberar o capturador parcial.
         }
     }
 
