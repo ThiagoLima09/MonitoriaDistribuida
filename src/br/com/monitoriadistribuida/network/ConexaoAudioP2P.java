@@ -230,8 +230,11 @@ public class ConexaoAudioP2P implements Closeable {
 
     private void iniciarThreadReproducao() {
         threadReproducao = new Thread(() -> {
+            SourceDataLine linhaReproducao = null;
+
             try {
-                linhaAltoFalante = abrirLinhaAltoFalante();
+                linhaReproducao = abrirLinhaAltoFalante();
+                linhaAltoFalante = linhaReproducao;
 
                 while (true) {
                     if (!executando || !escutaExecutando) {
@@ -246,7 +249,7 @@ public class ConexaoAudioP2P implements Closeable {
 
                     byte[] buffer = new byte[tamanhoPacote];
                     entrada.readFully(buffer);
-                    linhaAltoFalante.write(buffer, 0, buffer.length);
+                    linhaReproducao.write(buffer, 0, buffer.length);
                 }
             } catch (EOFException | SocketException e) {
                 conectado = false;
@@ -257,7 +260,7 @@ public class ConexaoAudioP2P implements Closeable {
                     ouvinte.aoOcorrerErroAudio("Falha ao reproduzir áudio: " + e.getMessage());
                 }
             } finally {
-                fecharAltoFalante();
+                fecharAltoFalante(linhaReproducao);
             }
         }, "thread-reproducao-audio");
 
@@ -321,18 +324,43 @@ public class ConexaoAudioP2P implements Closeable {
         try {
             linha.stop();
         } catch (RuntimeException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // A linha do microfone pode já ter parado por falta de permissão ou encerramento da chamada.
         }
 
         linha.close();
     }
 
-    private void fecharAltoFalante() {
-        if (linhaAltoFalante != null) {
-            linhaAltoFalante.drain();
-            linhaAltoFalante.stop();
-            linhaAltoFalante.close();
+    private synchronized void fecharAltoFalante() {
+        SourceDataLine linha = linhaAltoFalante;
+        linhaAltoFalante = null;
+        fecharAltoFalante(linha);
+    }
+
+    private synchronized void fecharAltoFalante(SourceDataLine linha) {
+        if (linha == null) {
+            return;
+        }
+
+        if (linhaAltoFalante == linha) {
             linhaAltoFalante = null;
+        }
+
+        try {
+            linha.drain();
+        } catch (RuntimeException ignored) {
+            // Ao encerrar a chamada, a linha de saída pode já estar inválida.
+        }
+
+        try {
+            linha.stop();
+        } catch (RuntimeException ignored) {
+            // Outra thread pode já ter parado o alto-falante durante o encerramento.
+        }
+
+        try {
+            linha.close();
+        } catch (RuntimeException ignored) {
+            // O driver de áudio pode já ter liberado essa linha.
         }
     }
 
@@ -344,7 +372,7 @@ public class ConexaoAudioP2P implements Closeable {
         try {
             fechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // Streams podem já estar fechados quando a chamada é encerrada.
         }
     }
 
@@ -356,7 +384,7 @@ public class ConexaoAudioP2P implements Closeable {
         try {
             socketFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O socket pode já ter sido fechado pela outra ponta da chamada.
         }
     }
 
@@ -368,7 +396,7 @@ public class ConexaoAudioP2P implements Closeable {
         try {
             socketServidorFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O servidor local de áudio pode já ter parado junto com a janela de chamada.
         }
     }
 

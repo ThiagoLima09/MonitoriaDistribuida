@@ -23,7 +23,6 @@ import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
@@ -118,14 +117,25 @@ public class MenuAlunoView extends JFrame {
         badge.setForeground(SwingUtils.PRIMARY_DARK);
         badge.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
+        JButton encerrarSessaoButton = SwingUtils.createDangerButton("Encerrar Sessão");
+        encerrarSessaoButton.setPreferredSize(new Dimension(
+                encerrarSessaoButton.getPreferredSize().width,
+                badge.getPreferredSize().height));
+        encerrarSessaoButton.addActionListener(e -> sairConta());
+
+        JPanel sessionActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        sessionActions.setOpaque(false);
+        sessionActions.add(badge);
+        sessionActions.add(encerrarSessaoButton);
+
         panel.add(left, BorderLayout.WEST);
-        panel.add(badge, BorderLayout.EAST);
+        panel.add(sessionActions, BorderLayout.EAST);
         return panel;
     }
 
     private JPanel createActionCard() {
         JPanel card = SwingUtils.createCardPanel();
-        card.setLayout(new GridBagLayout());
+        card.setLayout(new BorderLayout());
 
         JPanel inner = new JPanel(new GridBagLayout());
         inner.setOpaque(false);
@@ -134,34 +144,24 @@ public class MenuAlunoView extends JFrame {
         gbc.gridx = 0;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.insets = new Insets(0, 0, 12, 0);
 
         JLabel section = SwingUtils.createSectionLabel("Ações do aluno");
         section.setFont(section.getFont().deriveFont(Font.BOLD, 20f));
 
-        JButton listarDisciplinasButton = SwingUtils.createSecondaryButton("Listar disciplinas");
         JButton buscarMonitoresButton = SwingUtils.createPrimaryButton("Buscar monitores");
-        JButton sairButton = SwingUtils.createGhostButton("Sair da conta");
 
-        listarDisciplinasButton.addActionListener(e -> mostrarDisciplinas());
         buscarMonitoresButton.addActionListener(e -> buscarMonitores());
-        sairButton.addActionListener(e -> sairConta());
 
         gbc.gridy = 0;
         inner.add(section, gbc);
         gbc.gridy++;
         inner.add(labeledField("Disciplina", disciplinaCombo), gbc);
         gbc.gridy++;
-        inner.add(listarDisciplinasButton, gbc);
-        gbc.gridy++;
         inner.add(buscarMonitoresButton, gbc);
-        gbc.gridy++;
-        inner.add(sairButton, gbc);
-        gbc.gridy++;
-        gbc.weighty = 1.0;
-        inner.add(Box.createVerticalStrut(1), gbc);
 
-        card.add(inner, new GridBagConstraints());
+        card.add(inner, BorderLayout.NORTH);
         return card;
     }
 
@@ -169,59 +169,35 @@ public class MenuAlunoView extends JFrame {
         JPanel card = SwingUtils.createCardPanel();
         card.setLayout(new BorderLayout(0, 16));
 
-        JLabel section = SwingUtils.createSectionLabel("Resultado");
+        JLabel section = SwingUtils.createSectionLabel("Monitores Disponíveis");
         section.setFont(section.getFont().deriveFont(Font.BOLD, 20f));
 
         respostaArea.setRows(18);
         resultadoPanel.setBackground(new Color(248, 250, 252));
-        mostrarTextoResultado("As respostas dos comandos do servidor central aparecerão aqui.");
-
-        JPanel chips = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        chips.setOpaque(false);
-        chips.add(createChip("Disciplinas"));
-        chips.add(createChip("Monitores"));
-        chips.add(createChip("Atendimento"));
+        mostrarTextoResultado("");
 
         card.add(section, BorderLayout.NORTH);
         card.add(SwingUtils.createScrollPane(resultadoPanel), BorderLayout.CENTER);
-        card.add(chips, BorderLayout.SOUTH);
         return card;
     }
 
-    private JLabel createChip(String text) {
-        JLabel chip = new JLabel(text);
-        chip.setOpaque(true);
-        chip.setBackground(new Color(241, 245, 249));
-        chip.setForeground(SwingUtils.TEXT);
-        chip.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
-        return chip;
-    }
-
     private JPanel labeledField(String labelText, java.awt.Component field) {
-        JPanel panel = new JPanel();
+        JPanel panel = new JPanel(new BorderLayout(0, 6));
         panel.setOpaque(false);
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         JLabel label = new JLabel(labelText);
         label.setForeground(SwingUtils.TEXT);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
-        panel.add(label);
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(field);
+        field.setPreferredSize(new Dimension(300, 40));
+        field.setMinimumSize(new Dimension(300, 40));
+        panel.add(label, BorderLayout.NORTH);
+        panel.add(field, BorderLayout.CENTER);
         return panel;
-    }
-
-    private void mostrarDisciplinas() {
-        StringBuilder builder = new StringBuilder("Disciplinas retornadas pelo servidor central:\n\n");
-        for (Disciplina disciplina : controller.listarDisciplinas()) {
-            builder.append("• ").append(disciplina.getNomeExibicao()).append('\n');
-        }
-        mostrarTextoResultado(builder.toString());
     }
 
     private void buscarMonitores() {
         Disciplina disciplina = (Disciplina) disciplinaCombo.getSelectedItem();
         if (disciplina == null) {
-            SwingUtils.showWarning(this, "Busca", "Selecione uma disciplina.");
+            SwingUtils.showWarning(this, "Busca", "Escolha uma disciplina para buscar monitores.");
             return;
         }
 
@@ -241,7 +217,7 @@ public class MenuAlunoView extends JFrame {
         }
 
         if (solicitacaoEmAndamento) {
-            SwingUtils.showWarning(this, "Atendimento", "Aguarde a solicitação em andamento.");
+            SwingUtils.showWarning(this, "Atendimento", "Já existe uma solicitação em andamento.");
             return;
         }
 
@@ -261,7 +237,10 @@ public class MenuAlunoView extends JFrame {
             } catch (Exception ex) {
                 SwingUtilities.invokeLater(() -> {
                     solicitacaoEmAndamento = false;
-                    SwingUtils.showError(this, "Atendimento", ex.getMessage());
+                    SwingUtils.showError(
+                            this,
+                            "Atendimento",
+                            "Não foi possível iniciar o atendimento.\n\nDetalhes: " + ex.getMessage());
                     mostrarMonitores(monitoresExibidos);
                 });
             }
@@ -284,10 +263,6 @@ public class MenuAlunoView extends JFrame {
         lista.setOpaque(false);
         lista.setLayout(new BoxLayout(lista, BoxLayout.Y_AXIS));
 
-        JLabel titulo = SwingUtils.createSectionLabel("Monitores disponíveis");
-        titulo.setBorder(new EmptyBorder(0, 0, 12, 0));
-        lista.add(titulo);
-
         for (InformacoesMonitor monitor : monitores) {
             lista.add(criarCardMonitor(monitor));
             lista.add(Box.createVerticalStrut(10));
@@ -300,7 +275,7 @@ public class MenuAlunoView extends JFrame {
 
     private void abrirChatComMonitor(InformacoesMonitor monitor) {
         if (monitor.getPortaChat() <= 0) {
-            SwingUtils.showError(this, "Atendimento", "O monitor não informou uma porta de chat válida.");
+            SwingUtils.showError(this, "Atendimento", "O chat do monitor ainda não está disponível.");
             return;
         }
 
@@ -323,7 +298,10 @@ public class MenuAlunoView extends JFrame {
             try {
                 acaoServidor.executar();
             } catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> SwingUtils.showError(this, "Servidor", ex.getMessage()));
+                SwingUtilities.invokeLater(() -> SwingUtils.showError(
+                        this,
+                        "Servidor",
+                        "Não foi possível se comunicar com o servidor.\n\nDetalhes: " + ex.getMessage()));
             }
         }, nomeThread);
 
@@ -415,6 +393,12 @@ public class MenuAlunoView extends JFrame {
     private void atualizarResultado() {
         resultadoPanel.revalidate();
         resultadoPanel.repaint();
+    }
+
+    public void aoChatAtendimentoEncerrado() {
+        solicitacaoEmAndamento = false;
+        monitoresExibidos = new ArrayList<>();
+        mostrarTextoResultado("");
     }
 
     private void sairConta() {

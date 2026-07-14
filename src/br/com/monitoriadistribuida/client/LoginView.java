@@ -2,17 +2,22 @@ package br.com.monitoriadistribuida.client;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.RenderingHints;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
@@ -58,40 +63,19 @@ public class LoginView extends JFrame {
         badge.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         badge.setAlignmentX(LEFT_ALIGNMENT);
 
-        JLabel title = SwingUtils.createTitle("Acesse o sistema");
+        JLabel title = SwingUtils.createTitle("Acesse o Sistema");
         title.setAlignmentX(LEFT_ALIGNMENT);
-
-        JLabel subtitle = new JLabel(
-                "<html><div style='width:330px'>Entre com seu e-mail e senha para acessar as telas conectadas ao servidor central: cadastro, consulta de disciplinas, busca de monitores e atualização de status.</div></html>");
-        subtitle.setForeground(SwingUtils.MUTED);
-        subtitle.setFont(subtitle.getFont().deriveFont(16f));
-        subtitle.setAlignmentX(LEFT_ALIGNMENT);
 
         panel.add(badge);
         panel.add(Box.createVerticalStrut(22));
         panel.add(title);
-        panel.add(Box.createVerticalStrut(12));
-        panel.add(subtitle);
-        panel.add(Box.createVerticalStrut(28));
-        panel.add(createFeatureLabel("Login por e-mail e senha"));
-        panel.add(createFeatureLabel("Cadastro de aluno ou monitor"));
-        panel.add(createFeatureLabel("Menus alinhados ao servidor central"));
         panel.add(Box.createVerticalGlue());
 
         return panel;
     }
 
-    private JLabel createFeatureLabel(String text) {
-        JLabel label = new JLabel("• " + text);
-        label.setForeground(SwingUtils.TEXT);
-        label.setFont(label.getFont().deriveFont(Font.PLAIN, 15f));
-        label.setAlignmentX(LEFT_ALIGNMENT);
-        label.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        return label;
-    }
-
     private JPanel createLoginCard() {
-        JPanel card = SwingUtils.createCardPanel();
+        JPanel card = createRoundedCardPanel();
         card.setPreferredSize(new Dimension(360, 0));
         card.setLayout(new GridBagLayout());
 
@@ -107,14 +91,8 @@ public class LoginView extends JFrame {
         JLabel title = SwingUtils.createSectionLabel("Entrar");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 20f));
 
-        JLabel helper = new JLabel("Use o mesmo e-mail cadastrado no servidor central.");
+        JLabel helper = new JLabel("Informe os dados para realizar o login");
         helper.setForeground(SwingUtils.MUTED);
-
-        JLabel profileHint = new JLabel("O servidor central identifica se você é aluno ou monitor.");
-        profileHint.setForeground(new Color(146, 64, 14));
-        profileHint.setOpaque(true);
-        profileHint.setBackground(new Color(255, 247, 237));
-        profileHint.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
 
         JButton entrarButton = SwingUtils.createPrimaryButton("Entrar");
         JButton cadastroButton = SwingUtils.createSecondaryButton("Cadastrar");
@@ -124,9 +102,6 @@ public class LoginView extends JFrame {
 
         gbc.gridy++;
         inner.add(helper, gbc);
-
-        gbc.gridy++;
-        inner.add(profileHint, gbc);
 
         gbc.gridy++;
         inner.add(labeledField("E-mail", emailField), gbc);
@@ -151,14 +126,45 @@ public class LoginView extends JFrame {
         return card;
     }
 
+    private JPanel createRoundedCardPanel() {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(SwingUtils.CARD_BACKGROUND);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 28, 28);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+
+            @Override
+            protected void paintBorder(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(226, 232, 240));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 28, 28);
+                g2.dispose();
+            }
+        };
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        return panel;
+    }
+
     private JPanel labeledField(String labelText, java.awt.Component field) {
         JPanel panel = new JPanel();
         panel.setOpaque(false);
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel label = new JLabel(labelText);
         label.setForeground(SwingUtils.TEXT);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         field.setPreferredSize(new Dimension(280, 40));
+        if (field instanceof JComponent swingField) {
+            swingField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        }
         panel.add(label);
         panel.add(Box.createVerticalStrut(6));
         panel.add(field);
@@ -174,7 +180,11 @@ public class LoginView extends JFrame {
                 SessionContext session = controller.autenticar(email, senha);
                 SwingUtilities.invokeLater(() -> abrirMenuUsuario(session));
             } catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> SwingUtils.showError(this, "Login", ex.getMessage()));
+                SwingUtilities.invokeLater(() -> SwingUtils.showError(
+                        this,
+                        "Login",
+                        "Não foi possível entrar. Verifique seus dados e tente novamente.\n\nDetalhes: "
+                                + ex.getMessage()));
             }
         }, "thread-login-servidor");
 

@@ -8,8 +8,14 @@ import br.com.monitoriadistribuida.server.model.TipoUsuario;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Desktop;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -18,10 +24,12 @@ import java.io.IOException;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -46,6 +54,8 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
     private final JTextArea areaMensagens = SwingUtils.createTextArea();
     private final JTextField campoMensagem = SwingUtils.createTextField("Mensagem");
     private final JLabel rotuloStatus = new JLabel();
+    private final DefaultListModel<ArquivoTransferido> arquivosModel = new DefaultListModel<>();
+    private final JList<ArquivoTransferido> listaArquivos = new JList<>(arquivosModel);
     private final ServicoTransferenciaArquivo servicoTransferenciaArquivo = new ServicoTransferenciaArquivo(this);
     private volatile PeerConnection conexaoPar;
     private volatile int portaArquivoLocal = -1;
@@ -132,6 +142,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
     public void aoReceberArquivo(File arquivo) {
         SwingUtilities.invokeLater(() -> {
             adicionarMensagem("Sistema", "Arquivo recebido: " + arquivo.getAbsolutePath());
+            registrarArquivoTrocado("Recebido", arquivo);
             definirStatus("Arquivo recebido", SwingUtils.SUCCESS);
         });
     }
@@ -145,7 +156,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
     }
 
     private void montarTela(String statusInicial) {
-        SwingUtils.configureFrame(this, "Monitoria Distribuida - " + tituloMonitoria(), 780, 560);
+        SwingUtils.configureFrame(this, "Monitoria Distribuida - " + tituloMonitoria(), 960, 600);
         setContentPane(SwingUtils.createRootPanel());
         addWindowListener(new WindowAdapter() {
             @Override
@@ -157,7 +168,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
         JPanel conteudo = SwingUtils.createCardPanel();
         conteudo.setLayout(new BorderLayout(0, 18));
         conteudo.add(criarCabecalho(statusInicial), BorderLayout.NORTH);
-        conteudo.add(criarPainelMensagens(), BorderLayout.CENTER);
+        conteudo.add(criarPainelCentral(), BorderLayout.CENTER);
         conteudo.add(criarCompositor(), BorderLayout.SOUTH);
 
         getContentPane().add(conteudo, BorderLayout.CENTER);
@@ -190,10 +201,48 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
         return cabecalho;
     }
 
+    private JPanel criarPainelCentral() {
+        JPanel painel = new JPanel(new BorderLayout(14, 0));
+        painel.setOpaque(false);
+        painel.add(criarPainelMensagens(), BorderLayout.CENTER);
+        painel.add(criarPainelArquivos(), BorderLayout.EAST);
+        return painel;
+    }
+
     private JScrollPane criarPainelMensagens() {
         areaMensagens.setRows(16);
         areaMensagens.setText("");
         return SwingUtils.createScrollPane(areaMensagens);
+    }
+
+    private JPanel criarPainelArquivos() {
+        JPanel painel = new JPanel(new BorderLayout(0, 10));
+        painel.setOpaque(false);
+        painel.setPreferredSize(new Dimension(240, 0));
+
+        JLabel titulo = SwingUtils.createSectionLabel("Arquivos trocados");
+        titulo.setFont(titulo.getFont().deriveFont(Font.BOLD, 15f));
+
+        listaArquivos.setBackground(new Color(248, 250, 252));
+        listaArquivos.setForeground(SwingUtils.TEXT);
+        listaArquivos.setFixedCellHeight(48);
+        listaArquivos.setCellRenderer(new ArquivoTransferidoRenderer());
+        listaArquivos.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    abrirArquivoSelecionado();
+                }
+            }
+        });
+
+        JButton abrirButton = SwingUtils.createSecondaryButton("Abrir");
+        abrirButton.addActionListener(e -> abrirArquivoSelecionado());
+
+        painel.add(titulo, BorderLayout.NORTH);
+        painel.add(SwingUtils.createScrollPane(listaArquivos), BorderLayout.CENTER);
+        painel.add(abrirButton, BorderLayout.SOUTH);
+        return painel;
     }
 
     private JPanel criarCompositor() {
@@ -234,7 +283,10 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
             } catch (IOException | IllegalArgumentException e) {
                 SwingUtilities.invokeLater(() -> {
                     definirStatus("Falha na conexão", SwingUtils.DANGER);
-                    SwingUtils.showError(this, "Chat", "Não foi possível conectar ao par: " + e.getMessage());
+                    SwingUtils.showError(
+                            this,
+                            "Chat",
+                            "Não foi possível conectar ao atendimento.\n\nDetalhes: " + e.getMessage());
                 });
             }
         }, "thread-conexao-chat");
@@ -246,10 +298,13 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
     private void aguardarPar(int portaEscuta) {
         try {
             conexaoPar = new PeerConnection(portaEscuta, this);
-            definirStatus("Aguardando na porta " + conexaoPar.getPortaLocal(), SwingUtils.WARNING);
+            definirStatus("Aguardando Aluno", SwingUtils.WARNING);
         } catch (IOException | IllegalArgumentException e) {
             definirStatus("Falha ao abrir porta", SwingUtils.DANGER);
-            SwingUtils.showError(this, "Chat", "Não foi possível abrir a porta P2P: " + e.getMessage());
+            SwingUtils.showError(
+                    this,
+                    "Chat",
+                    "Não foi possível preparar o chat.\n\nDetalhes: " + e.getMessage());
         }
     }
 
@@ -261,7 +316,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
         }
 
         if (conexaoPar == null || !conexaoPar.estaConectado()) {
-            SwingUtils.showWarning(this, "Chat", "Nenhum par conectado.");
+            SwingUtils.showWarning(this, "Chat", "A conexão ainda não está ativa.");
             return;
         }
 
@@ -272,7 +327,10 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
             definirStatus("Conectado", SwingUtils.SUCCESS);
         } catch (IOException e) {
             definirStatus("Falha no envio", SwingUtils.DANGER);
-            SwingUtils.showError(this, "Chat", "Não foi possível enviar a mensagem: " + e.getMessage());
+            SwingUtils.showError(
+                    this,
+                    "Chat",
+                    "Não foi possível enviar a mensagem.\n\nDetalhes: " + e.getMessage());
         }
     }
 
@@ -282,7 +340,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
         }
 
         if (portaArquivoPar <= 0) {
-            SwingUtils.showWarning(this, "Arquivo", "O par ainda não informou a porta de arquivos.");
+            SwingUtils.showWarning(this, "Arquivo", "A transferência de arquivos ainda não está pronta.");
             anunciarPortaArquivo();
             return;
         }
@@ -302,12 +360,16 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
                 servicoTransferenciaArquivo.enviarArquivo(enderecoDestino, portaArquivoPar, arquivo);
                 SwingUtilities.invokeLater(() -> {
                     adicionarMensagem("Eu", "Arquivo enviado: " + arquivo.getName());
+                    registrarArquivoTrocado("Enviado", arquivo);
                     definirStatus("Arquivo enviado", SwingUtils.SUCCESS);
                 });
             } catch (Exception e) {
                 SwingUtilities.invokeLater(() -> {
                     definirStatus("Falha no arquivo", SwingUtils.DANGER);
-                    SwingUtils.showError(this, "Arquivo", "Não foi possível enviar o arquivo: " + e.getMessage());
+                    SwingUtils.showError(
+                            this,
+                            "Arquivo",
+                            "Não foi possível enviar o arquivo.\n\nDetalhes: " + e.getMessage());
                 });
             }
         }, "thread-envio-arquivo");
@@ -333,7 +395,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
 
         if (portaVideo <= 0 || portaAudio <= 0) {
             chamada.dispose();
-            SwingUtils.showError(this, "Chamada", "Não foi possível abrir portas de mídia.");
+            SwingUtils.showError(this, "Chamada", "Não foi possível iniciar a chamada.");
             return;
         }
 
@@ -364,7 +426,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
                 if (conexaoPar != null && conexaoPar.getEnderecoPar() != null) {
                     enderecoArquivoPar = conexaoPar.getEnderecoPar();
                 }
-                definirStatus("Arquivos disponíveis", SwingUtils.SUCCESS);
+                definirStatus("Online", SwingUtils.SUCCESS);
                 anunciarPortaArquivo();
             } catch (NumberFormatException e) {
                 definirStatus("Porta de arquivo inválida", SwingUtils.DANGER);
@@ -453,7 +515,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
 
     private boolean validarConexaoAtiva() {
         if (conexaoPar == null || !conexaoPar.estaConectado()) {
-            SwingUtils.showWarning(this, "Chat", "Nenhum par conectado.");
+            SwingUtils.showWarning(this, "Chat", "A conexão ainda não está ativa.");
             return false;
         }
 
@@ -475,6 +537,45 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
     private void adicionarMensagem(String autor, String mensagem) {
         areaMensagens.append(autor + ": " + mensagem + "\n");
         areaMensagens.setCaretPosition(areaMensagens.getDocument().getLength());
+    }
+
+    private void registrarArquivoTrocado(String direcao, File arquivo) {
+        if (arquivo == null) {
+            return;
+        }
+
+        arquivosModel.add(0, new ArquivoTransferido(direcao, arquivo));
+        if (!arquivosModel.isEmpty()) {
+            listaArquivos.setSelectedIndex(0);
+        }
+    }
+
+    private void abrirArquivoSelecionado() {
+        ArquivoTransferido arquivo = listaArquivos.getSelectedValue();
+        if (arquivo == null) {
+            SwingUtils.showWarning(this, "Arquivo", "Escolha um arquivo da lista para abrir.");
+            return;
+        }
+
+        File destino = arquivo.getArquivo();
+        if (!destino.exists()) {
+            SwingUtils.showWarning(this, "Arquivo", "Esse arquivo não está mais disponível no computador.");
+            return;
+        }
+
+        if (!Desktop.isDesktopSupported()) {
+            SwingUtils.showWarning(this, "Arquivo", "Não foi possível abrir arquivos automaticamente neste sistema.");
+            return;
+        }
+
+        try {
+            Desktop.getDesktop().open(destino);
+        } catch (IOException | IllegalArgumentException e) {
+            SwingUtils.showError(
+                    this,
+                    "Arquivo",
+                    "Não foi possível abrir o arquivo.\n\nDetalhes: " + e.getMessage());
+        }
     }
 
     private void definirStatus(String texto, Color cor) {
@@ -501,6 +602,7 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
 
         if (telaAnterior != null) {
             SwingUtils.exibirCentralizado(telaAnterior);
+            notificarTelaAnteriorChatEncerrado();
         }
 
         fecharRecursosChatEmSegundoPlano(notificarPar ? CONTROLE_CHAT_ENCERRADO : null);
@@ -517,11 +619,20 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
 
         if (telaAnterior != null) {
             SwingUtils.exibirCentralizado(telaAnterior);
-            SwingUtils.showInfo(telaAnterior, "Chat", "O par encerrou o chat P2P.");
+            notificarTelaAnteriorChatEncerrado();
+            SwingUtils.showInfo(telaAnterior, "Chat", "Conexão encerrada.");
         }
 
         fecharChamadaMidiaNaEdt();
         fecharRecursosChatEmSegundoPlano();
+    }
+
+    private void notificarTelaAnteriorChatEncerrado() {
+        if (telaAnterior instanceof MenuMonitorView) {
+            ((MenuMonitorView) telaAnterior).aoChatAtendimentoEncerrado();
+        } else if (telaAnterior instanceof MenuAlunoView) {
+            ((MenuAlunoView) telaAnterior).aoChatAtendimentoEncerrado();
+        }
     }
 
     private void fecharRecursosChat() {
@@ -631,5 +742,62 @@ public class ChatView extends JFrame implements MessageListener, OuvinteTransfer
         }
 
         return "Aluno";
+    }
+
+    private static final class ArquivoTransferido {
+        private final String direcao;
+        private final File arquivo;
+
+        private ArquivoTransferido(String direcao, File arquivo) {
+            this.direcao = direcao;
+            this.arquivo = arquivo;
+        }
+
+        private File getArquivo() {
+            return arquivo;
+        }
+
+        @Override
+        public String toString() {
+            return direcao + " - " + arquivo.getName();
+        }
+    }
+
+    private static final class ArquivoTransferidoRenderer extends JPanel
+            implements javax.swing.ListCellRenderer<ArquivoTransferido> {
+
+        private final JLabel nomeLabel = new JLabel();
+        private final JLabel caminhoLabel = new JLabel();
+
+        private ArquivoTransferidoRenderer() {
+            setLayout(new GridLayout(2, 1, 0, 2));
+            setBorder(new EmptyBorder(6, 8, 6, 8));
+            nomeLabel.setFont(nomeLabel.getFont().deriveFont(Font.BOLD, 13f));
+            caminhoLabel.setFont(caminhoLabel.getFont().deriveFont(Font.PLAIN, 11f));
+            add(nomeLabel);
+            add(caminhoLabel);
+        }
+
+        @Override
+        public Component getListCellRendererComponent(JList<? extends ArquivoTransferido> list,
+                                                      ArquivoTransferido value,
+                                                      int index,
+                                                      boolean isSelected,
+                                                      boolean cellHasFocus) {
+            if (value == null) {
+                nomeLabel.setText("");
+                caminhoLabel.setText("");
+            } else {
+                nomeLabel.setText(value.toString());
+                String pasta = value.getArquivo().getParent();
+                caminhoLabel.setText(pasta == null ? "" : pasta);
+            }
+
+            Color background = isSelected ? new Color(219, 234, 254) : new Color(248, 250, 252);
+            setBackground(background);
+            nomeLabel.setForeground(SwingUtils.TEXT);
+            caminhoLabel.setForeground(SwingUtils.MUTED);
+            return this;
+        }
     }
 }

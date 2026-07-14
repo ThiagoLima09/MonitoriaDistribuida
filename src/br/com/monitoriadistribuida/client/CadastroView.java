@@ -2,11 +2,15 @@ package br.com.monitoriadistribuida.client;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.RenderingHints;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -14,6 +18,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
@@ -67,40 +72,19 @@ public class CadastroView extends JFrame {
         badge.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         badge.setAlignmentX(LEFT_ALIGNMENT);
 
-        JLabel title = SwingUtils.createTitle("Criar conta");
+        JLabel title = SwingUtils.createTitle("Criar Conta");
         title.setAlignmentX(LEFT_ALIGNMENT);
-
-        JLabel subtitle = new JLabel(
-                "<html><div style='width:290px'>Cadastro simples com nome, e-mail, senha e tipo de usuário. Sem campos extras, porque o servidor central não pede mais do que isso.</div></html>");
-        subtitle.setForeground(SwingUtils.MUTED);
-        subtitle.setFont(subtitle.getFont().deriveFont(16f));
-        subtitle.setAlignmentX(LEFT_ALIGNMENT);
 
         panel.add(badge);
         panel.add(Box.createVerticalStrut(22));
         panel.add(title);
-        panel.add(Box.createVerticalStrut(12));
-        panel.add(subtitle);
-        panel.add(Box.createVerticalStrut(28));
-        panel.add(createFeatureLabel("Nome completo"));
-        panel.add(createFeatureLabel("E-mail e senha"));
-        panel.add(createFeatureLabel("Aluno ou monitor"));
         panel.add(Box.createVerticalGlue());
 
         return panel;
     }
 
-    private JLabel createFeatureLabel(String text) {
-        JLabel label = new JLabel("• " + text);
-        label.setForeground(SwingUtils.TEXT);
-        label.setFont(label.getFont().deriveFont(Font.PLAIN, 15f));
-        label.setAlignmentX(LEFT_ALIGNMENT);
-        label.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        return label;
-    }
-
     private JPanel createCard() {
-        JPanel card = SwingUtils.createCardPanel();
+        JPanel card = createRoundedCardPanel();
         card.setLayout(new GridBagLayout());
         SwingUtils.styleComboBox(tipoCombo);
         JPanel inner = new JPanel(new GridBagLayout());
@@ -115,7 +99,7 @@ public class CadastroView extends JFrame {
         JLabel title = SwingUtils.createSectionLabel("Cadastro");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 20f));
 
-        JLabel helper = new JLabel("Os dados abaixo correspondem ao que o servidor central cadastra hoje.");
+        JLabel helper = new JLabel("Informe os dados para o cadastro");
         helper.setForeground(SwingUtils.MUTED);
 
         JButton cadastrarButton = SwingUtils.createPrimaryButton("Cadastrar");
@@ -126,13 +110,13 @@ public class CadastroView extends JFrame {
         gbc.gridy++;
         inner.add(helper, gbc);
         gbc.gridy++;
-        inner.add(labeledField("Nome completo", nomeField), gbc);
+        inner.add(labeledField("Nome Completo", nomeField), gbc);
         gbc.gridy++;
-        inner.add(labeledField("E-mail", emailField), gbc);
+        inner.add(labeledField("Email", emailField), gbc);
         gbc.gridy++;
         inner.add(labeledField("Senha", senhaField), gbc);
         gbc.gridy++;
-        inner.add(labeledField("Confirmação de senha", confirmacaoField), gbc);
+        inner.add(labeledField("Confirmação de Senha", confirmacaoField), gbc);
         gbc.gridy++;
         inner.add(labeledField("Tipo de usuário", tipoCombo), gbc);
         gbc.gridy++;
@@ -150,14 +134,45 @@ public class CadastroView extends JFrame {
         return card;
     }
 
+    private JPanel createRoundedCardPanel() {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(SwingUtils.CARD_BACKGROUND);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 28, 28);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+
+            @Override
+            protected void paintBorder(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(226, 232, 240));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 28, 28);
+                g2.dispose();
+            }
+        };
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        return panel;
+    }
+
     private JPanel labeledField(String labelText, java.awt.Component field) {
         JPanel panel = new JPanel();
         panel.setOpaque(false);
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel label = new JLabel(labelText);
         label.setForeground(SwingUtils.TEXT);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         field.setPreferredSize(new Dimension(320, 40));
+        if (field instanceof JComponent swingField) {
+            swingField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        }
         panel.add(label);
         panel.add(Box.createVerticalStrut(6));
         panel.add(field);
@@ -175,11 +190,14 @@ public class CadastroView extends JFrame {
             try {
                 controller.cadastrar(nome, email, senha, confirmacao, tipoUsuario);
                 SwingUtilities.invokeLater(() -> {
-                    SwingUtils.showInfo(this, "Cadastro", "Cadastro realizado com sucesso.");
+                    SwingUtils.showInfo(this, "Cadastro", "Cadastro criado com sucesso.");
                     voltarLogin();
                 });
             } catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> SwingUtils.showError(this, "Cadastro", ex.getMessage()));
+                SwingUtilities.invokeLater(() -> SwingUtils.showError(
+                        this,
+                        "Cadastro",
+                        "Não foi possível criar o cadastro.\n\nDetalhes: " + ex.getMessage()));
             }
         }, "thread-cadastro-servidor");
 

@@ -16,12 +16,9 @@ import java.util.List;
 
 public class UsuarioRepositorioMySql {
 
-    private final boolean tabelaPossuiNome;
-
     public UsuarioRepositorioMySql() throws SQLException {
         try (Connection conexao = ConexaoBancoDados.abrirConexao()) {
             garantirEstruturaTabela(conexao);
-            tabelaPossuiNome = existeColuna(conexao, "usuario", "nome");
         }
     }
 
@@ -36,16 +33,10 @@ public class UsuarioRepositorioMySql {
 
         try (Connection conexao = ConexaoBancoDados.abrirConexao();
              PreparedStatement comando = conexao.prepareStatement(criarSqlCadastro())) {
-            if (tabelaPossuiNome) {
-                comando.setString(1, normalizarNome(usuario));
-                comando.setString(2, usuario.getEmail());
-                comando.setString(3, usuario.getSenha());
-                comando.setString(4, usuario.getTipo().getCodigoBanco());
-            } else {
-                comando.setString(1, usuario.getEmail());
-                comando.setString(2, usuario.getSenha());
-                comando.setString(3, usuario.getTipo().getCodigoBanco());
-            }
+            comando.setString(1, normalizarNome(usuario));
+            comando.setString(2, usuario.getEmail());
+            comando.setString(3, usuario.getSenha());
+            comando.setString(4, usuario.getTipo().getCodigoBanco());
 
             comando.executeUpdate();
             return true;
@@ -99,8 +90,7 @@ public class UsuarioRepositorioMySql {
 
     public List<Usuario> listarUsuarios() throws SQLException {
         List<Usuario> usuarios = new ArrayList<>();
-        String ordenacao = tabelaPossuiNome ? "nome" : "email";
-        String sql = criarSqlConsultaUsuario("ORDER BY " + ordenacao);
+        String sql = criarSqlConsultaUsuario("ORDER BY nome");
 
         try (Connection conexao = ConexaoBancoDados.abrirConexao();
              PreparedStatement comando = conexao.prepareStatement(sql);
@@ -118,6 +108,7 @@ public class UsuarioRepositorioMySql {
             comando.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS usuario (
                         idUsuario INT NOT NULL AUTO_INCREMENT,
+                        nome VARCHAR(160) NOT NULL,
                         email VARCHAR(160) NOT NULL,
                         senha VARCHAR(120) NOT NULL,
                         tipoUsuario ENUM('M', 'A') NOT NULL,
@@ -125,27 +116,28 @@ public class UsuarioRepositorioMySql {
                     )
                     """);
 
+            if (!existeColuna(conexao, "usuario", "nome")) {
+                comando.executeUpdate("ALTER TABLE usuario ADD COLUMN nome VARCHAR(160) NULL AFTER idUsuario");
+            }
+
             if (!existeColuna(conexao, "usuario", "email")) {
-                comando.executeUpdate("ALTER TABLE usuario ADD COLUMN email VARCHAR(160) NULL AFTER idUsuario");
+                comando.executeUpdate("ALTER TABLE usuario ADD COLUMN email VARCHAR(160) NULL AFTER nome");
 
                 if (existeColuna(conexao, "usuario", "nome")) {
                     comando.executeUpdate("UPDATE usuario SET email = nome WHERE email IS NULL OR TRIM(email) = ''");
                 }
             }
+
+            comando.executeUpdate("UPDATE usuario SET nome = email WHERE nome IS NULL OR TRIM(nome) = ''");
         }
     }
 
     private String criarSqlCadastro() {
-        if (tabelaPossuiNome) {
-            return "INSERT INTO usuario (nome, email, senha, tipoUsuario) VALUES (?, ?, ?, ?)";
-        }
-
-        return "INSERT INTO usuario (email, senha, tipoUsuario) VALUES (?, ?, ?)";
+        return "INSERT INTO usuario (nome, email, senha, tipoUsuario) VALUES (?, ?, ?, ?)";
     }
 
     private String criarSqlConsultaUsuario(String complemento) {
-        String campoNome = tabelaPossuiNome ? "nome" : "email AS nome";
-        return "SELECT " + campoNome + ", email, senha, tipoUsuario FROM usuario " + complemento;
+        return "SELECT nome, email, senha, tipoUsuario FROM usuario " + complemento;
     }
 
     private boolean existeColuna(Connection conexao, String tabela, String coluna) throws SQLException {
