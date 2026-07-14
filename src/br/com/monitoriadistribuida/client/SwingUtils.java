@@ -85,7 +85,7 @@ public final class SwingUtils {
     }
 
     public static JPanel createCardPanel() {
-        JPanel panel = new JPanel();
+        JPanel panel = new RoundedCardPanel();
         panel.setBackground(CARD_BACKGROUND);
         panel.setBorder(new CompoundCardBorder());
         return panel;
@@ -173,6 +173,10 @@ public final class SwingUtils {
 
     public static JButton createSecondaryButton(String text) {
         return createButton(text, SECONDARY, TEXT);
+    }
+
+    public static JButton createDangerButton(String text) {
+        return createButton(text, DANGER, Color.WHITE);
     }
 
     public static JButton createGhostButton(String text) {
@@ -263,6 +267,24 @@ public final class SwingUtils {
             super(
                     new LineBorder(new Color(226, 232, 240), 1, true),
                     new EmptyBorder(24, 24, 24, 24));
+        }
+    }
+
+    private static final class RoundedCardPanel extends JPanel {
+        private static final int ARC = 18;
+
+        private RoundedCardPanel() {
+            setOpaque(false);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), ARC, ARC);
+            g2.dispose();
+            super.paintComponent(g);
         }
     }
 }
