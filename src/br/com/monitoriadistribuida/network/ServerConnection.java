@@ -178,7 +178,7 @@ public class ServerConnection implements Closeable {
                 saida.println("SAIR");
             }
         } catch (RuntimeException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // A conexão pode já estar fechada; nesse caso não há servidor para notificar.
         }
 
         saida.close();
@@ -186,13 +186,13 @@ public class ServerConnection implements Closeable {
         try {
             entrada.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O socket pode ter caído antes do fechamento manual da entrada.
         }
 
         try {
             conexaoSocket.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O socket pode já ter sido fechado pelo sistema ou pelo servidor.
         }
     }
 
