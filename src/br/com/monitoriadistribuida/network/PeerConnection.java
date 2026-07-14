@@ -238,7 +238,7 @@ public class PeerConnection implements Closeable {
         try {
             fechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // Streams podem já ter sido encerrados quando o par fecha o chat.
         }
     }
 
@@ -250,7 +250,7 @@ public class PeerConnection implements Closeable {
         try {
             socketFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O socket pode já ter sido fechado pela outra ponta da conexão.
         }
     }
 
@@ -262,7 +262,7 @@ public class PeerConnection implements Closeable {
         try {
             socketServidorFechavel.close();
         } catch (IOException ignored) {
-            // Fechamento em shutdown: melhor esforço.
+            // O servidor local pode já ter sido fechado ao encerrar a espera por conexão.
         }
     }
 
