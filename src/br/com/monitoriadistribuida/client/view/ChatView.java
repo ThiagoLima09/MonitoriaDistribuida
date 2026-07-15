@@ -1,5 +1,6 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
 
+import br.com.monitoriadistribuida.client.SessionContext;
 import br.com.monitoriadistribuida.network.MessageListener;
 import br.com.monitoriadistribuida.network.OuvinteTransferenciaArquivo;
 import br.com.monitoriadistribuida.network.PeerConnection;

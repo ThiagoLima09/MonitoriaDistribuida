@@ -1,4 +1,9 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
+
+import br.com.monitoriadistribuida.client.SessionContext;
+import br.com.monitoriadistribuida.client.controller.MonitorController;
+import br.com.monitoriadistribuida.server.model.Disciplina;
+import br.com.monitoriadistribuida.server.model.StatusMonitor;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -18,9 +23,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
-
-import br.com.monitoriadistribuida.server.model.Disciplina;
-import br.com.monitoriadistribuida.server.model.StatusMonitor;
 
 public class MenuMonitorView extends JFrame {
 

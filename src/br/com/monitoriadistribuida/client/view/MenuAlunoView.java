@@ -1,4 +1,9 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
+
+import br.com.monitoriadistribuida.client.SessionContext;
+import br.com.monitoriadistribuida.client.controller.AlunoController;
+import br.com.monitoriadistribuida.network.InformacoesMonitor;
+import br.com.monitoriadistribuida.server.model.Disciplina;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -27,9 +32,6 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-
-import br.com.monitoriadistribuida.network.InformacoesMonitor;
-import br.com.monitoriadistribuida.server.model.Disciplina;
 
 import java.util.ArrayList;
 import java.util.List;

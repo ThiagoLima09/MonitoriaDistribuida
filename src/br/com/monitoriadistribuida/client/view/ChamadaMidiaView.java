@@ -1,5 +1,6 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
 
+import br.com.monitoriadistribuida.client.SessionContext;
 import br.com.monitoriadistribuida.network.OuvinteChamadaAudio;
 import br.com.monitoriadistribuida.network.ConexaoAudioP2P;
 import br.com.monitoriadistribuida.network.FonteQuadroTela;

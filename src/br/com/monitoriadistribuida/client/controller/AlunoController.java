@@ -1,4 +1,4 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.controller;
 
 import br.com.monitoriadistribuida.network.InformacoesMonitor;
 import br.com.monitoriadistribuida.network.ServerConnection;

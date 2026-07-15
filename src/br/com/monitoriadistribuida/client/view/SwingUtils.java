@@ -1,4 +1,4 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
 
 import java.awt.Color;
 import java.awt.Component;

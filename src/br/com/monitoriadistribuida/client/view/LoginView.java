@@ -1,4 +1,7 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
+
+import br.com.monitoriadistribuida.client.SessionContext;
+import br.com.monitoriadistribuida.client.controller.LoginController;
 
 import java.awt.BorderLayout;
 import java.awt.Color;

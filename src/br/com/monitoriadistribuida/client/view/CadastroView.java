@@ -1,4 +1,7 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.view;
+
+import br.com.monitoriadistribuida.client.controller.CadastroController;
+import br.com.monitoriadistribuida.server.model.TipoUsuario;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -25,8 +28,6 @@ import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-
-import br.com.monitoriadistribuida.server.model.TipoUsuario;
 
 public class CadastroView extends JFrame {
 

@@ -1,5 +1,8 @@
 package br.com.monitoriadistribuida.client;
 
+import br.com.monitoriadistribuida.client.view.LoginView;
+import br.com.monitoriadistribuida.client.view.SwingUtils;
+
 import javax.swing.SwingUtilities;
 
 public class ClientMain {

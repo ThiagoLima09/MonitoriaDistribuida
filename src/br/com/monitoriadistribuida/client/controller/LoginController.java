@@ -1,5 +1,6 @@
-package br.com.monitoriadistribuida.client;
+package br.com.monitoriadistribuida.client.controller;
 
+import br.com.monitoriadistribuida.client.SessionContext;
 import br.com.monitoriadistribuida.network.ResultadoLogin;
 import br.com.monitoriadistribuida.network.ServerConnection;
 
