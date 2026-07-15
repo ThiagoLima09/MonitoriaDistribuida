@@ -106,4 +106,3 @@ recursos de conversa acontecem diretamente entre clientes:
 O monitor abre portas dinamicas para receber conexoes P2P. O servidor central
 repassa essas portas para o aluno durante a solicitacao de atendimento.
 
-```
